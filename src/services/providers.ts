@@ -6,6 +6,14 @@ import type {
 } from "../types/chat";
 import { newId } from "../utils/id";
 
+export interface ModelInfo {
+  id: string;
+  /** Label pendek buat dropdown model (kalau kosong: pakai id apa adanya). */
+  label?: string;
+  /** Deskripsi satu baris ala Gemini ("Jawaban tercepat", dll). */
+  blurb?: string;
+}
+
 export interface ProviderTemplate {
   id: ProviderId;
   label: string;
@@ -14,6 +22,8 @@ export interface ProviderTemplate {
   defaultModel: string;
   /** Known model ids for suggestions (user can still type any model). */
   models: string[];
+  /** Metadata tampilan model yang dikenal (sisa model = tanpa subtitle). */
+  modelInfo?: ModelInfo[];
   /** Short hint for the API key input placeholder. */
   keyHint?: string;
 }
@@ -45,6 +55,21 @@ export const PROVIDERS: ProviderTemplate[] = [
       "minimax-m3",
       "minimax-m2.7",
       "hy3",
+    ],
+    modelInfo: [
+      { id: "deepseek-v4-flash", label: "Flash", blurb: "model.blurb.flash" },
+      { id: "deepseek-v4-pro", label: "Pro", blurb: "model.blurb.deep" },
+      { id: "kimi-k3", blurb: "model.blurb.deep" },
+      { id: "kimi-k2.7-code", label: "K2.7 Code", blurb: "model.blurb.code" },
+      { id: "kimi-k2.6" },
+      { id: "glm-5.3" },
+      { id: "glm-5.2" },
+      { id: "glm-5.1" },
+      { id: "mimo-v2.5", blurb: "model.blurb.vision" },
+      { id: "mimo-v2.5-pro" },
+      { id: "minimax-m3" },
+      { id: "minimax-m2.7" },
+      { id: "hy3" },
     ],
     keyHint: "Paste your API key from the OpenCode Zen console (opencode.ai/zen)",
   },
@@ -135,4 +160,14 @@ export function createProviderConfig(
 export function getActiveProvider(settings: AppSettings): ProviderConfig {
   const found = settings.providers.find((provider) => provider.id === settings.activeProviderId);
   return found ?? settings.providers[0];
+}
+
+/** Label + blurb buat model di dropdown header; unknown model = label = id. */
+export function resolveModelInfo(
+  kind: ProviderId,
+  modelId: string,
+): { label: string; blurbKey?: string } {
+  const def = getProvider(kind);
+  const info = def.modelInfo?.find((m) => m.id === modelId);
+  return { label: info?.label ?? modelId, blurbKey: info?.blurb };
 }

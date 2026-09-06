@@ -2,10 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
-import { getActiveProvider, getProvider } from "../services/providers";
+import { getActiveProvider } from "../services/providers";
 import { pickAndCompressImage } from "../utils/image";
 import type { ContentPart, ThinkingLevel } from "../types/chat";
 import { Sheet } from "./Sheet";
@@ -19,20 +20,23 @@ const THINK_LABELS: Record<ThinkingLevel, "chat.thinkingOff" | "chat.thinkingLow
   max: "chat.thinkingMax",
 };
 
+/** Composer v2: satu pill rounded-full melayang — [attach][input][send],
+ * plus mini-toolbar thinking di dalam pill (model pindah ke header). */
 export function Composer() {
-  const { settings, streamingId, send, stop, setThinking, setModel } = useStore();
+  const { settings, streamingId, send, stop, setThinking } = useStore();
   const provider = getActiveProvider(settings);
   const { t } = useI18n();
   const { c } = useTheme();
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
   const [images, setImages] = useState<ContentPart[]>([]);
-  const [modelSheet, setModelSheet] = useState(false);
-  const [customModel, setCustomModel] = useState("");
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   const streaming = streamingId !== null;
   const canSend = text.trim().length > 0 || images.length > 0;
 
   const attach = async () => {
+    setToolsOpen(false);
     try {
       const part = await pickAndCompressImage();
       if (part) {
@@ -58,17 +62,8 @@ export function Composer() {
   const nextLevel = THINK_LEVELS[(THINK_LEVELS.indexOf(currentLevel) + 1) % THINK_LEVELS.length];
   const thinkingOn = currentLevel !== "off";
 
-  const templateModels = getProvider(provider.kind).models;
-  const applyModel = (model: string) => {
-    const clean = model.trim();
-    if (clean) {
-      setModel(clean);
-    }
-    setModelSheet(false);
-  };
-
   return (
-    <View style={[styles.wrap, { backgroundColor: c.surface, borderTopColor: c.border }]}>
+    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       {images.length > 0 ? (
         <View style={styles.thumbRow}>
           {images.map((part, i) => (
@@ -90,21 +85,32 @@ export function Composer() {
         </View>
       ) : null}
 
-      <View style={styles.inputRow}>
-        <Pressable onPress={attach} hitSlop={8} style={styles.iconBtn}>
-          <Ionicons name="image-outline" size={22} color={c.muted} />
+      <View style={[styles.pill, { backgroundColor: c.panel, borderColor: c.border }]}>
+        <Pressable onPress={() => setToolsOpen(true)} hitSlop={8} style={styles.iconBtn}>
+          <Ionicons name="add" size={24} color={c.text} />
         </Pressable>
+
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder={t("chat.placeholder")}
+          placeholder={t("chat.askLumen")}
           placeholderTextColor={c.muted}
           multiline
-          style={[
-            styles.input,
-            { color: c.text, backgroundColor: c.input, borderColor: c.border },
-          ]}
+          style={[styles.input, { color: c.text }]}
         />
+
+        <Pressable
+          onPress={() => setThinking(nextLevel)}
+          style={[styles.thinkBtn, thinkingOn && { backgroundColor: c.accent + "26" }]}
+          hitSlop={6}
+        >
+          <Ionicons
+            name="sparkles-outline"
+            size={17}
+            color={thinkingOn ? c.accent : c.muted}
+          />
+        </Pressable>
+
         {streaming ? (
           <Pressable onPress={stop} style={[styles.sendBtn, { backgroundColor: c.danger }]}>
             <Ionicons name="stop" size={18} color="#ffffff" />
@@ -113,83 +119,24 @@ export function Composer() {
           <Pressable
             onPress={onSend}
             disabled={!canSend}
-            style={[styles.sendBtn, { backgroundColor: canSend ? c.accent : c.border }]}
+            style={[styles.sendBtn, { backgroundColor: canSend ? c.accent : c.input }]}
           >
-            <Ionicons name="arrow-up" size={18} color={canSend ? c.onAccent : c.muted} />
+            <Ionicons name="arrow-up" size={19} color={canSend ? c.onAccent : c.muted} />
           </Pressable>
         )}
       </View>
 
-      <View style={styles.toolbar}>
-        <Pressable
-          onPress={() => setThinking(nextLevel)}
-          style={[
-            styles.chip,
-            {
-              borderColor: thinkingOn ? c.accent : c.border,
-              backgroundColor: thinkingOn ? c.accent + "1f" : "transparent",
-            },
-          ]}
-        >
-          <Ionicons
-            name="sparkles-outline"
-            size={13}
-            color={thinkingOn ? c.accent : c.muted}
-          />
-          <Text style={{ fontSize: 12, color: thinkingOn ? c.accent : c.muted }}>
-            {t(THINK_LABELS[currentLevel])}
-          </Text>
+      {/* Sheet "tools" ala Gemini: grid aksi singkat di sekitar input. */}
+      <Sheet visible={toolsOpen} title={t("chat.attachImage")} onClose={() => setToolsOpen(false)}>
+        <Pressable onPress={attach} style={[styles.toolRow, { borderColor: c.border }]}>
+          <Ionicons name="images-outline" size={20} color={c.text} />
+          <Text style={{ color: c.text, fontSize: 14 }}>{t("chat.attachImage")}</Text>
         </Pressable>
-        <Pressable onPress={() => setModelSheet(true)} style={[styles.chip, { borderColor: c.border }]}>
-          <Ionicons name="layers-outline" size={13} color={c.muted} />
-          <Text style={{ fontSize: 12, color: c.muted, maxWidth: 150 }} numberOfLines={1}>
-            {provider.model || "model"}
+        <View style={[styles.toolRow, { borderColor: c.border, opacity: 0.45 }]}>
+          <Ionicons name="mic-outline" size={20} color={c.text} />
+          <Text style={{ color: c.muted, fontSize: 14 }}>
+            {t("message.readAloud")} — soon
           </Text>
-          <Ionicons name="chevron-down" size={12} color={c.muted} />
-        </Pressable>
-        <View style={{ flex: 1 }} />
-        <Text style={{ fontSize: 11, color: c.muted }} numberOfLines={1}>
-          {provider.name}
-        </Text>
-      </View>
-
-      <Sheet visible={modelSheet} onClose={() => setModelSheet(false)} title={t("chat.model")}>
-        {templateModels.map((m) => (
-          <Pressable
-            key={m}
-            onPress={() => applyModel(m)}
-            style={[
-              styles.modelRow,
-              { backgroundColor: provider.model === m ? c.accent + "1f" : "transparent" },
-            ]}
-          >
-            <Text style={{ color: provider.model === m ? c.accent : c.text, fontSize: 14 }}>
-              {m}
-            </Text>
-            {provider.model === m ? (
-              <Ionicons name="checkmark-circle" size={16} color={c.accent} />
-            ) : null}
-          </Pressable>
-        ))}
-        <View style={styles.customRow}>
-          <TextInput
-            value={customModel}
-            onChangeText={setCustomModel}
-            placeholder={t("settings.modelPlaceholder")}
-            placeholderTextColor={c.muted}
-            style={[
-              styles.customInput,
-              { color: c.text, backgroundColor: c.input, borderColor: c.border },
-            ]}
-          />
-          <Pressable
-            onPress={() => applyModel(customModel)}
-            style={[styles.customSave, { backgroundColor: c.accent }]}
-          >
-            <Text style={{ color: c.onAccent, fontSize: 13, fontWeight: "600" }}>
-              {t("common.save")}
-            </Text>
-          </Pressable>
         </View>
       </Sheet>
     </View>
@@ -198,19 +145,18 @@ export function Composer() {
 
 const styles = StyleSheet.create({
   wrap: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingHorizontal: 10,
+    paddingTop: 6,
   },
   thumbRow: {
     flexDirection: "row",
     gap: 8,
     marginBottom: 8,
     flexWrap: "wrap",
+    paddingHorizontal: 4,
   },
   thumb: { position: "relative" },
-  thumbImage: { width: 56, height: 56, borderRadius: 10 },
+  thumbImage: { width: 56, height: 56, borderRadius: 12 },
   thumbRemove: {
     position: "absolute",
     top: -6,
@@ -218,66 +164,39 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 2,
   },
-  inputRow: {
+  pill: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 6,
+    alignItems: "center",
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingLeft: 6,
+    paddingRight: 6,
+    paddingVertical: 4,
+    gap: 2,
   },
   iconBtn: { padding: 8 },
   input: {
     flex: 1,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingTop: 9,
-    paddingBottom: 9,
-    maxHeight: 110,
-    fontSize: 15,
-    borderWidth: StyleSheet.hairlineWidth,
+    maxHeight: 96,
+    fontSize: 16,
+    paddingVertical: 8,
+  },
+  thinkBtn: {
+    padding: 7,
+    borderRadius: 16,
   },
   sendBtn: {
-    padding: 10,
-    borderRadius: 22,
-  },
-  toolbar: {
-    flexDirection: "row",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
-    paddingVertical: 6,
-    gap: 8,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  modelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 2,
-  },
-  customRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 12,
-  },
-  customInput: {
-    flex: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  customSave: {
-    borderRadius: 12,
-    paddingHorizontal: 14,
     justifyContent: "center",
+  },
+  toolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
   },
 });

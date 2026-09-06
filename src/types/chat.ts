@@ -71,6 +71,10 @@ export interface AppSettings {
   activeProviderId: string;
   theme: ThemeMode;
   language: Lang;
+  /** Hex accent color (override preset palet). Default biru Lumen. */
+  accent?: string;
+  /** Nama panggilan di greeting layar home. */
+  profileName?: string;
 }
 
 export interface AIMessage {

@@ -30,7 +30,7 @@ function Root() {
       lang={settings.language}
       onLangChange={(lang) => updateSettings({ language: lang })}
     >
-      <ThemeProvider theme={settings.theme}>
+      <ThemeProvider theme={settings.theme} accent={settings.accent}>
         <ThemedRoot />
       </ThemeProvider>
     </I18nProvider>

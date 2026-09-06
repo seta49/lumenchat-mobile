@@ -71,6 +71,43 @@ const en = {
   // Typing indicator
   "typing.thinking": "Lumen is thinking…",
 
+  // Model dropdown (v2)
+  "model.blurb.flash": "Fastest answers",
+  "model.blurb.deep": "Advanced reasoning",
+  "model.blurb.code": "Tuned for code",
+  "model.blurb.vision": "Multimodal — sees images",
+  "model.reasoning": "Reasoning",
+
+  // Home / composer (v2)
+  "chat.greeting": "Hey {name}, what's on your mind?",
+  "chat.greetingDefault": "What's on your mind?",
+  "chat.askLumen": "Ask Lumen…",
+
+  // Sidebar v2
+  "sidebar.newChat": "New chat",
+  "sidebar.searchChats": "Search conversations",
+  "sidebar.recents": "Recents",
+
+  // Profile screen (v2)
+  "profile.title": "My Lumen",
+  "profile.name": "Your name",
+  "profile.nameHint": "Shown in the home greeting",
+  "profile.appearance": "Appearance",
+  "profile.accent": "Accent color",
+  "profile.providersRow": "Providers & API keys",
+  "profile.providersSub": "{n} configured",
+  "profile.dataRow": "Data & storage",
+  "profile.dataSub": "{n} chats stored on this device",
+  "profile.clearAll": "Clear all chats",
+  "profile.clearAllConfirm": "Delete ALL chat history? This cannot be undone.",
+  "profile.about": "About",
+  "profile.aboutSub": "Lumen mobile — your AI, your keys",
+  "accent.blue": "Blue",
+  "accent.green": "Green",
+  "accent.purple": "Purple",
+  "accent.orange": "Orange",
+  "accent.pink": "Pink",
+
   // Command palette
   "palette.openSettings": "Open Settings",
   "palette.export": "Export chats (JSON)",
@@ -200,6 +237,43 @@ const id: Record<TranslationKey, string> = {
 
   // Typing indicator
   "typing.thinking": "Lumen sedang berpikir…",
+
+  // Model dropdown (v2)
+  "model.blurb.flash": "Jawaban tercepat",
+  "model.blurb.deep": "Penalaran canggih",
+  "model.blurb.code": "Disetel untuk kode",
+  "model.blurb.vision": "Multimodal — bisa lihat gambar",
+  "model.reasoning": "Penalaran",
+
+  // Home / composer (v2)
+  "chat.greeting": "Halo {name}, apa yang kamu pikirkan?",
+  "chat.greetingDefault": "Apa yang kamu pikirkan?",
+  "chat.askLumen": "Minta Lumen…",
+
+  // Sidebar v2
+  "sidebar.newChat": "Chat baru",
+  "sidebar.searchChats": "Telusuri percakapan",
+  "sidebar.recents": "Terbaru",
+
+  // Profile screen (v2)
+  "profile.title": "My Lumen",
+  "profile.name": "Nama kamu",
+  "profile.nameHint": "Ditampilkan di sapaan layar home",
+  "profile.appearance": "Tampilan",
+  "profile.accent": "Warna aksen",
+  "profile.providersRow": "Provider & API key",
+  "profile.providersSub": "{n} terkonfigurasi",
+  "profile.dataRow": "Data & penyimpanan",
+  "profile.dataSub": "{n} chat tersimpan di perangkat ini",
+  "profile.clearAll": "Hapus semua chat",
+  "profile.clearAllConfirm": "Hapus SEMUA riwayat chat? Tidak bisa dibatalkan.",
+  "profile.about": "Tentang",
+  "profile.aboutSub": "Lumen mobile — AI-mu, key-mu",
+  "accent.blue": "Biru",
+  "accent.green": "Hijau",
+  "accent.purple": "Ungu",
+  "accent.orange": "Oranye",
+  "accent.pink": "Pink",
 
   // Command palette
   "palette.openSettings": "Buka Pengaturan",

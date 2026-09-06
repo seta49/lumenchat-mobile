@@ -11,13 +11,19 @@ import type {
 import { newId } from "../utils/id";
 
 // Versi mobile: data disimpan di AsyncStorage (pengganti localStorage web).
-const SETTINGS_KEY = "lumen-ai.settings.v4";
+const SETTINGS_KEY = "lumen-ai.settings.v5";
 const CHATS_KEY = "lumen-ai.chats.v2";
 
 // Legacy keys (one-time migration):
+//  - v4 era: multi-provider, tanpa accent/profileName
 //  - v3 era: single provider fields (providerId/baseUrl/apiKey/model/apiFormat)
 //  - v1/v2 era: Hermes gateway settings (apiKey/baseUrl/profile)
-const LEGACY_SETTINGS_KEYS = ["lumen-ai.settings.v3", "lumen-ai.settings.v2", "lumen-ai.settings"];
+const LEGACY_SETTINGS_KEYS = [
+  "lumen-ai.settings.v4",
+  "lumen-ai.settings.v3",
+  "lumen-ai.settings.v2",
+  "lumen-ai.settings",
+];
 const LEGACY_CHATS_KEY = "lumen-ai.chats";
 
 type LegacyV3Settings = Partial<{
@@ -170,8 +176,26 @@ export async function loadSettings(): Promise<AppSettings> {
     // One-time migration from older shapes.
     let migrated: ProviderConfig | null = null;
 
-    // v3 (single provider fields)
-    for (const key of ["lumen-ai.settings.v3"]) {
+    // v4 (multi-provider list, tanpa accent/profileName)
+    const v4 = safeParse<Partial<AppSettings>>(
+      await AsyncStorage.getItem("lumen-ai.settings.v4"),
+      {},
+    );
+    if (Array.isArray(v4.providers)) {
+      const providers = v4.providers.filter(isValidProviderConfig).map(sanitizeProvider);
+      if (providers.length > 0) {
+        out.providers = providers;
+        const activeStillExists = providers.some((p) => p.id === v4.activeProviderId);
+        out.activeProviderId =
+          typeof v4.activeProviderId === "string" && activeStillExists
+            ? v4.activeProviderId
+            : providers[0].id;
+      }
+      if (typeof v4.theme === "string") out.theme = v4.theme === "light" ? "light" : "dark";
+      if (v4.language === "en" || v4.language === "id") out.language = v4.language;
+    } else {
+      // v3 (single provider fields)
+      for (const key of ["lumen-ai.settings.v3"]) {
       migrated = fromV3Settings(safeParse<LegacyV3Settings>(await AsyncStorage.getItem(key), {}));
       if (migrated) {
         break;
@@ -209,6 +233,14 @@ export async function loadSettings(): Promise<AppSettings> {
       }
       break;
     }
+    }
+  }
+
+  if (typeof stored.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(stored.accent)) {
+    out.accent = stored.accent;
+  }
+  if (typeof stored.profileName === "string") {
+    out.profileName = stored.profileName;
   }
 
   return out;

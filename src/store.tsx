@@ -35,6 +35,11 @@ interface StoreValue {
   renameThread: (id: string, title: string) => void;
   setActiveThread: (id: string) => void;
   send: (text: string, images: ContentPart[]) => Promise<void>;
+  /** Generate ulang jawaban assistant (hapus pesan itu, kirim ulang konteks s/d sebelumnya). */
+  regenerate: (assistantMessageId: string) => Promise<void>;
+  /** Ganti isi pesan user & hapus semua pesan setelahnya, lalu stream jawaban baru. */
+  editAndResend: (userMessageId: string, text: string) => Promise<void>;
+  deleteMessage: (messageId: string) => void;
   stop: () => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   addProvider: (config: ProviderConfig) => void;
@@ -64,6 +69,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Snapshot terbaru buat dipakai di async callback (send/stop) tanpa stale closure.
   const stateRef = useRef({ settings, threads, activeThreadId });
   stateRef.current = { settings, threads, activeThreadId };
+  const streamingIdRef = useRef<string | null>(null);
+  streamingIdRef.current = streamingId;
 
   // ------------------------------------------------------------------ load
   useEffect(() => {
@@ -133,6 +140,94 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setStreamingId(null);
   }, []);
 
+  /** Inti streaming: stream jawaban ke assistantMsgId di thread threadId dengan
+   * historyMessages sebagai konteks. Dipakai send/regenerate/editAndResend. */
+  const streamAssistant = useCallback(
+    async (
+      threadId: string,
+      assistantMsg: ChatMessage,
+      historyMessages: AIMessage[],
+      currentSettings: AppSettings,
+    ) => {
+      const provider = getActiveProvider(currentSettings);
+      if (!provider) {
+        setStreamingId(null);
+        return;
+      }
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setStreamingId(assistantMsg.id);
+
+      const appendDelta = (delta: string) => {
+        setThreads((ts) =>
+          ts.map((t) =>
+            t.id === threadId
+              ? {
+                  ...t,
+                  messages: t.messages.map((m) =>
+                    m.id === assistantMsg.id
+                      ? { ...m, content: (typeof m.content === "string" ? m.content : "") + delta }
+                      : m,
+                  ),
+                }
+              : t,
+          ),
+        );
+      };
+      const setUsage = (usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }) => {
+        setThreads((ts) =>
+          ts.map((t) =>
+            t.id === threadId
+              ? {
+                  ...t,
+                  messages: t.messages.map((m) => (m.id === assistantMsg.id ? { ...m, usage } : m)),
+                }
+              : t,
+          ),
+        );
+      };
+
+      try {
+        await streamProviderMessage({
+          settings: provider,
+          lang: currentSettings.language,
+          messages: historyMessages,
+          signal: controller.signal,
+          callbacks: { onDelta: appendDelta, onUsage: setUsage },
+        });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          const message = error instanceof Error ? error.message : String(error);
+          setThreads((ts) =>
+            ts.map((t) =>
+              t.id === threadId
+                ? {
+                    ...t,
+                    messages: t.messages.map((m) =>
+                      m.id === assistantMsg.id
+                        ? {
+                            ...m,
+                            content:
+                              typeof m.content === "string" && m.content.trim()
+                                ? m.content + `\n\n⚠️ ${message}`
+                                : message,
+                          }
+                        : m,
+                    ),
+                  }
+                : t,
+            ),
+          );
+        }
+      } finally {
+        abortRef.current = null;
+        setStreamingId(null);
+      }
+    },
+    [],
+  );
+
   const send = useCallback(async (text: string, images: ContentPart[]) => {
     const parts: ContentPart[] = [];
     if (text.trim()) {
@@ -178,85 +273,92 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       );
     }
 
-    const provider = getActiveProvider(currentSettings);
-    if (!provider) {
-      setStreamingId(null);
-      return;
-    }
-
     const historyMessages: AIMessage[] = existing.messages
       .filter((m) => m.id !== userMsg.id && m.id !== assistantMsg.id)
       .map((m) => ({ role: m.role, content: m.content }));
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStreamingId(assistantMsg.id);
+    await streamAssistant(threadId!, assistantMsg, historyMessages, currentSettings);
+  }, [streamAssistant]);
 
-    const appendDelta = (delta: string) => {
+  /** Regenerate: buang jawaban assistant tsb, stream ulang dari konteks sebelumnya. */
+  const regenerate = useCallback(
+    async (assistantMessageId: string) => {
+      if (streamingIdRef.current) return;
+      const { settings: currentSettings, threads: currentThreads } = stateRef.current;
+      const thread = currentThreads.find((t) => t.messages.some((m) => m.id === assistantMessageId));
+      if (!thread) return;
+      const idx = thread.messages.findIndex((m) => m.id === assistantMessageId);
+      const historyMessages: AIMessage[] = thread.messages
+        .slice(0, idx)
+        .map((m) => ({ role: m.role, content: m.content }));
+      if (!historyMessages.length) return;
+
+      const fresh: ChatMessage = {
+        id: newId(),
+        role: "assistant",
+        content: "",
+        createdAt: Date.now(),
+      };
       setThreads((ts) =>
         ts.map((t) =>
-          t.id === threadId
+          t.id === thread.id
             ? {
                 ...t,
-                messages: t.messages.map((m) =>
-                  m.id === assistantMsg.id
-                    ? { ...m, content: (typeof m.content === "string" ? m.content : "") + delta }
-                    : m,
-                ),
+                updatedAt: Date.now(),
+                messages: [...t.messages.slice(0, idx), fresh],
               }
             : t,
         ),
       );
-    };
-    const setUsage = (usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }) => {
+      await streamAssistant(thread.id, fresh, historyMessages, currentSettings);
+    },
+    [streamAssistant],
+  );
+
+  /** Edit pesan user: ganti isinya, buang SEMUA pesan setelahnya, stream jawaban baru. */
+  const editAndResend = useCallback(
+    async (userMessageId: string, text: string) => {
+      const { settings: currentSettings, threads: currentThreads } = stateRef.current;
+      const thread = currentThreads.find((t) => t.messages.some((m) => m.id === userMessageId));
+      if (!thread) return;
+      const idx = thread.messages.findIndex((m) => m.id === userMessageId);
+      const edited: ChatMessage = {
+        ...thread.messages[idx],
+        content: text.trim(),
+        createdAt: Date.now(),
+      };
+      const fresh: ChatMessage = {
+        id: newId(),
+        role: "assistant",
+        content: "",
+        createdAt: Date.now(),
+      };
+      const kept = [...thread.messages.slice(0, idx), edited];
       setThreads((ts) =>
         ts.map((t) =>
-          t.id === threadId
-            ? {
-                ...t,
-                messages: t.messages.map((m) => (m.id === assistantMsg.id ? { ...m, usage } : m)),
-              }
+          t.id === thread.id
+            ? { ...t, updatedAt: Date.now(), messages: [...kept, fresh] }
             : t,
         ),
       );
-    };
+      await streamAssistant(
+        thread.id,
+        fresh,
+        kept.map((m) => ({ role: m.role, content: m.content })),
+        currentSettings,
+      );
+    },
+    [streamAssistant],
+  );
 
-    try {
-      await streamProviderMessage({
-        settings: provider,
-        lang: currentSettings.language,
-        messages: historyMessages,
-        signal: controller.signal,
-        callbacks: { onDelta: appendDelta, onUsage: setUsage },
-      });
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        const message = error instanceof Error ? error.message : String(error);
-        setThreads((ts) =>
-          ts.map((t) =>
-            t.id === threadId
-              ? {
-                  ...t,
-                  messages: t.messages.map((m) =>
-                    m.id === assistantMsg.id
-                      ? {
-                          ...m,
-                          content:
-                            typeof m.content === "string" && m.content.trim()
-                              ? m.content + `\n\n⚠️ ${message}`
-                              : message,
-                        }
-                      : m,
-                  ),
-                }
-              : t,
-          ),
-        );
-      }
-    } finally {
-      abortRef.current = null;
-      setStreamingId(null);
-    }
+  const deleteMessage = useCallback((messageId: string) => {
+    setThreads((ts) =>
+      ts.map((t) =>
+        t.messages.some((m) => m.id === messageId)
+          ? { ...t, messages: t.messages.filter((m) => m.id !== messageId) }
+          : t,
+      ),
+    );
   }, []);
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
@@ -338,6 +440,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       renameThread,
       setActiveThread,
       send,
+      regenerate,
+      editAndResend,
+      deleteMessage,
       stop,
       updateSettings,
       addProvider,
@@ -359,6 +464,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       renameThread,
       setActiveThread,
       send,
+      regenerate,
+      editAndResend,
+      deleteMessage,
       stop,
       updateSettings,
       addProvider,

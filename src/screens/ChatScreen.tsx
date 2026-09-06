@@ -5,36 +5,81 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatMessage } from "../components/ChatMessage";
 import { Composer } from "../components/Composer";
+import { ModelSheet } from "../components/ModelSheet";
 import { Sidebar } from "../components/Sidebar";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
+import { resolveModelInfo } from "../services/providers";
 import type { ChatMessage as ChatMessageType } from "../types/chat";
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 function EmptyState() {
   const { c } = useTheme();
   const { t } = useI18n();
+  const { settings } = useStore();
+  const name = settings.profileName?.trim();
   return (
     <View style={styles.empty}>
-      <View style={[styles.emptyIcon, { backgroundColor: c.panel, borderColor: c.border }]}>
-        <Ionicons name="sparkles" size={26} color={c.accent} />
-      </View>
-      <Text style={[styles.emptyTitle, { color: c.text }]}>{t("chat.emptyTitle")}</Text>
-      <Text style={[styles.emptySub, { color: c.muted }]}>{t("chat.emptySubtitle")}</Text>
+      <SparkleMark />
+      <Text style={[styles.greeting, { color: c.text }]}>
+        {name ? t("chat.greeting", { name }) : t("chat.greetingDefault")}
+      </Text>
+    </View>
+  );
+}
+
+/** Sparkle 4-titik ala Gemini — digambar dengan 4 View rotated, no assets. */
+function SparkleMark() {
+  const { c } = useTheme();
+  const dots = [
+    { x: 0, y: -14, col: c.accent },
+    { x: 14, y: 0, col: c.accent + "cc" },
+    { x: 0, y: 14, col: c.accent + "99" },
+    { x: -14, y: 0, col: c.accent + "66" },
+  ];
+  return (
+    <View style={styles.sparkleWrap}>
+      {dots.map((d, i) => (
+        <View
+          key={i}
+          style={[
+            styles.sparkleDot,
+            {
+              backgroundColor: d.col,
+              transform: [
+                { translateX: d.x },
+                { translateY: d.y },
+                { rotate: "45deg" },
+              ],
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
 
 export function ChatScreen() {
-  const { activeThread, streamingId } = useStore();
+  const { activeThread, streamingId, settings, createThread } = useStore();
   const { c } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
   const listRef = useRef<FlatList<ChatMessageType>>(null);
 
   const messages = activeThread?.messages ?? [];
+  const provider = settings.providers.find((p) => p.id === settings.activeProviderId)
+    ?? settings.providers[0];
+  const modelLabel = provider ? resolveModelInfo(provider.kind, provider.model).label : "";
+  const thinkingOn = (provider?.thinking ?? "off") !== "off";
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
@@ -42,20 +87,41 @@ export function ChatScreen() {
         style={[
           styles.header,
           {
-            backgroundColor: c.surface,
+            backgroundColor: c.bg,
             borderBottomColor: c.border,
             paddingTop: insets.top + 6,
           },
         ]}
       >
         <Pressable onPress={() => setSidebarOpen(true)} hitSlop={8} style={styles.headerBtn}>
-          <Ionicons name="menu-outline" size={22} color={c.text} />
+          <Ionicons name="menu" size={22} color={c.text} />
         </Pressable>
-        <Text numberOfLines={1} style={[styles.headerTitle, { color: c.text }]}>
-          {activeThread?.title ?? "Lumen"}
-        </Text>
-        <Pressable onPress={() => router.push("/settings")} hitSlop={8} style={styles.headerBtn}>
-          <Ionicons name="settings-outline" size={21} color={c.text} />
+
+        <Pressable onPress={() => setModelOpen(true)} style={styles.modelChip}>
+          <Text numberOfLines={1} style={[styles.modelChipText, { color: c.text }]}>
+            {modelLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={c.muted} />
+        </Pressable>
+
+        <View style={{ flex: 1 }} />
+
+        <Pressable
+          onPress={() => createThread()}
+          hitSlop={8}
+          style={styles.headerBtn}
+          accessibilityLabel={t("sidebar.newChat")}
+        >
+          <Ionicons name="create-outline" size={21} color={c.text} />
+        </Pressable>
+        <Pressable
+          onPress={() => router.push("/profile")}
+          hitSlop={8}
+          style={[styles.avatar, { backgroundColor: c.accent }]}
+        >
+          <Text style={[styles.avatarText, { color: c.onAccent }]}>
+            {initialsOf(settings.profileName ?? "Lumen")}
+          </Text>
         </Pressable>
       </View>
 
@@ -74,6 +140,7 @@ export function ChatScreen() {
 
       <Composer />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <ModelSheet visible={modelOpen} onClose={() => setModelOpen(false)} thinkingOn={thinkingOn} />
     </View>
   );
 }
@@ -86,9 +153,27 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 4,
   },
   headerBtn: { padding: 8 },
-  headerTitle: { flex: 1, textAlign: "center", fontSize: 15, fontWeight: "600" },
+  modelChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    maxWidth: "55%",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  modelChipText: { fontSize: 15, fontWeight: "700" },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 4,
+  },
+  avatarText: { fontSize: 11, fontWeight: "800" },
   listContent: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -101,15 +186,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingBottom: 60,
   },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    marginBottom: 14,
-  },
-  emptyTitle: { fontSize: 17, fontWeight: "700", marginBottom: 6, textAlign: "center" },
-  emptySub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
+  sparkleWrap: { width: 60, height: 60, alignItems: "center", justifyContent: "center", marginBottom: 18 },
+  sparkleDot: { position: "absolute", width: 12, height: 12, borderRadius: 3 },
+  greeting: { fontSize: 24, fontWeight: "500", textAlign: "center", lineHeight: 32 },
 });
