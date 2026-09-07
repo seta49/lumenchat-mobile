@@ -11,6 +11,7 @@ export type ProviderApiFormat = "openai" | "anthropic";
 export type ProviderId =
   | "opencode-go"
   | "openai"
+  | "xiaomi-mimo"
   | "anthropic"
   | "openrouter"
   | "ollama"

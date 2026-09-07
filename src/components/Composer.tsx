@@ -1,39 +1,36 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
+import * as FS from "expo-file-system";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
-import { getActiveProvider } from "../services/providers";
 import { pickAndCompressImage } from "../utils/image";
-import type { ContentPart, ThinkingLevel } from "../types/chat";
+import type { ContentPart } from "../types/chat";
 import { Sheet } from "./Sheet";
 
-const THINK_LEVELS: ThinkingLevel[] = ["off", "low", "medium", "high", "max"];
-const THINK_LABELS: Record<ThinkingLevel, "chat.thinkingOff" | "chat.thinkingLow" | "chat.thinkingMedium" | "chat.thinkingHigh" | "chat.thinkingMax"> = {
-  off: "chat.thinkingOff",
-  low: "chat.thinkingLow",
-  medium: "chat.thinkingMedium",
-  high: "chat.thinkingHigh",
-  max: "chat.thinkingMax",
-};
+interface FileAttachment {
+  name: string;
+  text: string;
+}
 
-/** Composer v2: satu pill rounded-full melayang — [attach][input][send],
- * plus mini-toolbar thinking di dalam pill (model pindah ke header). */
+/** Composer v2.3: pill [+][input][mic][send], keyboard-aware native,
+ * attach gambar + dokumen (txt/md/json/csv/kode). */
 export function Composer() {
-  const { settings, streamingId, send, stop, setThinking } = useStore();
-  const provider = getActiveProvider(settings);
+  const { settings, streamingId, send, stop } = useStore();
   const { t } = useI18n();
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
   const [images, setImages] = useState<ContentPart[]>([]);
+  const [files, setFiles] = useState<FileAttachment[]>([]);
   const [toolsOpen, setToolsOpen] = useState(false);
 
   const streaming = streamingId !== null;
-  const canSend = text.trim().length > 0 || images.length > 0;
+  const canSend = text.trim().length > 0 || images.length > 0 || files.length > 0;
 
   const attach = async () => {
     setToolsOpen(false);
@@ -47,27 +44,69 @@ export function Composer() {
     }
   };
 
+  const attachFile = async () => {
+    setToolsOpen(false);
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        multiple: false,
+        type: [
+          "text/*",
+          "application/json",
+          "text/csv",
+          "application/pdf",
+          "text/markdown",
+          "application/javascript",
+          "text/x-python",
+        ],
+      });
+      if (res.canceled || !res.assets?.length) {
+        return;
+      }
+      const asset = res.assets[0];
+      // Baca sebagai teks (untuk PDF/binary besar, isi dipotong biar hemat).
+      const content = await FS.readAsStringAsync(asset.uri, {
+        encoding: FS.EncodingType.UTF8,
+      });
+      const clipped = content.length > 60_000 ? content.slice(0, 60_000) : content;
+      setFiles((f) => [...f, { name: asset.name ?? "file", text: clipped }]);
+    } catch {
+      // user cancel — diam saja
+    }
+  };
+
+  const removeFile = (i: number) => setFiles((f) => f.filter((_, j) => j !== i));
+
   const onSend = () => {
     if (!canSend || streaming) {
       return;
     }
-    const msg = text;
+    // File dijadikan teks context di depan prompt user.
+    let final = text;
+    if (files.length) {
+      const blocks = files
+        .map((f) => `--- file: ${f.name} ---\n${f.text}`)
+        .join("\n\n");
+      final = final.trim() ? `${blocksHeader(files.length)}${blocks}\n\n${text}` : `${blocks}\n${""}`;
+      if (!text.trim()) {
+        final = blocks;
+      }
+    }
     const imgs = images;
     setText("");
     setImages([]);
-    void send(msg, imgs);
+    setFiles([]);
+    void send(final, imgs);
   };
 
-  const currentLevel = provider.thinking ?? "off";
-  const nextLevel = THINK_LEVELS[(THINK_LEVELS.indexOf(currentLevel) + 1) % THINK_LEVELS.length];
-  const thinkingOn = currentLevel !== "off";
+  const blocksHeader = (n: number) =>
+    n > 1 ? `${t("file.attached", { n })}\n\n` : "";
 
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-      {images.length > 0 ? (
+      {images.length > 0 || files.length > 0 ? (
         <View style={styles.thumbRow}>
           {images.map((part, i) => (
-            <View key={i} style={styles.thumb}>
+            <View key={`img${i}`} style={styles.thumb}>
               <Image
                 source={{ uri: part.image_url?.url }}
                 style={styles.thumbImage}
@@ -79,6 +118,17 @@ export function Composer() {
                 hitSlop={6}
               >
                 <Ionicons name="close" size={12} color="#ffffff" />
+              </Pressable>
+            </View>
+          ))}
+          {files.map((f, i) => (
+            <View key={`file${i}`} style={[styles.fileChip, { backgroundColor: c.panel, borderColor: c.border }]}>
+              <Ionicons name="document-text-outline" size={14} color={c.text} />
+              <Text numberOfLines={1} style={[styles.fileName, { color: c.text }]}>
+                {f.name}
+              </Text>
+              <Pressable onPress={() => removeFile(i)} hitSlop={6} style={styles.fileRemove}>
+                <Ionicons name="close" size={12} color={c.muted} />
               </Pressable>
             </View>
           ))}
@@ -99,45 +149,38 @@ export function Composer() {
           style={[styles.input, { color: c.text }]}
         />
 
-        <Pressable
-          onPress={() => setThinking(nextLevel)}
-          style={[styles.thinkBtn, thinkingOn && { backgroundColor: c.accent + "26" }]}
-          hitSlop={6}
-        >
-          <Ionicons
-            name="sparkles-outline"
-            size={17}
-            color={thinkingOn ? c.accent : c.muted}
-          />
-        </Pressable>
-
         {streaming ? (
           <Pressable onPress={stop} style={[styles.sendBtn, { backgroundColor: c.danger }]}>
             <Ionicons name="stop" size={18} color="#ffffff" />
           </Pressable>
         ) : (
-          <Pressable
-            onPress={onSend}
-            disabled={!canSend}
-            style={[styles.sendBtn, { backgroundColor: canSend ? c.accent : c.input }]}
-          >
-            <Ionicons name="arrow-up" size={19} color={canSend ? c.onAccent : c.muted} />
-          </Pressable>
+          <>
+            {canSend ? null : (
+              <Pressable style={[styles.micBtn, { backgroundColor: c.input }]} hitSlop={6}>
+                <Ionicons name="mic-outline" size={19} color={c.muted} />
+              </Pressable>
+            )}
+            <Pressable
+              onPress={onSend}
+              disabled={!canSend}
+              style={[styles.sendBtn, { backgroundColor: canSend ? c.accent : c.input }]}
+            >
+              <Ionicons name="arrow-up" size={19} color={canSend ? c.onAccent : c.muted} />
+            </Pressable>
+          </>
         )}
       </View>
 
-      {/* Sheet "tools" ala Gemini: grid aksi singkat di sekitar input. */}
-      <Sheet visible={toolsOpen} title={t("chat.attachImage")} onClose={() => setToolsOpen(false)}>
-        <Pressable onPress={attach} style={[styles.toolRow, { borderColor: c.border }]}>
+      {/* Sheet attach: image + dokumen (voice dipindah ke pill). */}
+      <Sheet visible={toolsOpen} title={t("chat.attach")} onClose={() => setToolsOpen(false)}>
+        <Pressable onPress={attach} style={styles.toolRow}>
           <Ionicons name="images-outline" size={20} color={c.text} />
           <Text style={{ color: c.text, fontSize: 14 }}>{t("chat.attachImage")}</Text>
         </Pressable>
-        <View style={[styles.toolRow, { borderColor: c.border, opacity: 0.45 }]}>
-          <Ionicons name="mic-outline" size={20} color={c.text} />
-          <Text style={{ color: c.muted, fontSize: 14 }}>
-            {t("message.readAloud")} — soon
-          </Text>
-        </View>
+        <Pressable onPress={attachFile} style={styles.toolRow}>
+          <Ionicons name="document-outline" size={20} color={c.text} />
+          <Text style={{ color: c.text, fontSize: 14 }}>{t("chat.attachFile")}</Text>
+        </Pressable>
       </Sheet>
     </View>
   );
@@ -164,6 +207,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 2,
   },
+  fileChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    maxWidth: 180,
+  },
+  fileName: { fontSize: 12, flexShrink: 1, maxWidth: 110 },
+  fileRemove: { padding: 2 },
   pill: {
     flexDirection: "row",
     alignItems: "center",
@@ -181,9 +236,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 8,
   },
-  thinkBtn: {
-    padding: 7,
-    borderRadius: 16,
+  micBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sendBtn: {
     width: 40,

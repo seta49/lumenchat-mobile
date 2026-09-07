@@ -82,6 +82,21 @@ export const PROVIDERS: ProviderTemplate[] = [
     models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o3-mini"],
   },
   {
+    id: "xiaomi-mimo",
+    label: "Xiaomi MiMo",
+    baseUrl: "https://api.xiaomimimo.com/v1",
+    apiFormat: "openai",
+    defaultModel: "mimo-v2.5",
+    models: [
+      "mimo-v2.5",
+      "mimo-v2.5-pro",
+      "mimo-v2-pro",
+      "mimo-v2-omni",
+      "mimo-v2-flash",
+    ],
+    keyHint: "Paste your API key from platform.xiaomimimo.com",
+  },
+  {
     id: "anthropic",
     label: "Anthropic",
     baseUrl: "https://api.anthropic.com/v1",

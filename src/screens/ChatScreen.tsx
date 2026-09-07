@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatMessage } from "../components/ChatMessage";
 import { Composer } from "../components/Composer";
@@ -10,14 +10,7 @@ import { Sidebar } from "../components/Sidebar";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
-import { resolveModelInfo } from "../services/providers";
 import type { ChatMessage as ChatMessageType } from "../types/chat";
-
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
-}
 
 function EmptyState() {
   const { c } = useTheme();
@@ -70,7 +63,6 @@ export function ChatScreen() {
   const { c } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const listRef = useRef<FlatList<ChatMessageType>>(null);
@@ -78,8 +70,7 @@ export function ChatScreen() {
   const messages = activeThread?.messages ?? [];
   const provider = settings.providers.find((p) => p.id === settings.activeProviderId)
     ?? settings.providers[0];
-  const modelLabel = provider ? resolveModelInfo(provider.kind, provider.model).label : "";
-  const thinkingOn = (provider?.thinking ?? "off") !== "off";
+  const modelLabel = provider?.model ?? "";
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
@@ -114,17 +105,13 @@ export function ChatScreen() {
         >
           <Ionicons name="create-outline" size={21} color={c.text} />
         </Pressable>
-        <Pressable
-          onPress={() => router.push("/profile")}
-          hitSlop={8}
-          style={[styles.avatar, { backgroundColor: c.accent }]}
-        >
-          <Text style={[styles.avatarText, { color: c.onAccent }]}>
-            {initialsOf(settings.profileName ?? "Lumen")}
-          </Text>
-        </Pressable>
       </View>
 
+      <KeyboardAwareScrollView
+        bottomOffset={8}
+        style={styles.root}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
       <FlatList
         ref={listRef}
         data={messages}
@@ -136,11 +123,13 @@ export function ChatScreen() {
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         ListEmptyComponent={<EmptyState />}
         keyboardShouldPersistTaps="handled"
+        scrollEnabled={false}
       />
 
       <Composer />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <ModelSheet visible={modelOpen} onClose={() => setModelOpen(false)} thinkingOn={thinkingOn} />
+      <ModelSheet visible={modelOpen} onClose={() => setModelOpen(false)} />
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -165,15 +154,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   modelChipText: { fontSize: 15, fontWeight: "700" },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 4,
-  },
-  avatarText: { fontSize: 11, fontWeight: "800" },
   listContent: {
     paddingHorizontal: 12,
     paddingVertical: 10,

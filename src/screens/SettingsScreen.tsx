@@ -3,7 +3,8 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ProviderDialog } from "../components/ProviderDialog";
+import { ProviderDialog, ProviderModelSheet } from "../components/ProviderDialog";
+import { getActiveProvider } from "../services/providers";
 import { Sheet } from "../components/Sheet";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
@@ -75,8 +76,11 @@ export function SettingsScreen() {
   const insets = useSafeAreaInsets();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [modelSheetOpen, setModelSheetOpen] = useState(false);
   const [editing, setEditing] = useState<ProviderConfig | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ProviderConfig | null>(null);
+
+  const activeProvider = getActiveProvider(settings);
 
   const confirmDelete = () => {
     if (confirmRemove) {
@@ -101,6 +105,22 @@ export function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <SectionHeader icon="layers-outline" label={t("settings.defaultModel")} sub={t("settings.defaultModelHint")} />
+        <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <Pressable onPress={() => setModelSheetOpen(true)} style={styles.row}>
+            <Ionicons name="hardware-chip-outline" size={18} color={c.text} />
+            <View style={styles.rowBody}>
+              <Text style={[styles.rowTitle, { color: c.text }]}>
+                {activeProvider?.model || t("settings.modelPlaceholder")}
+              </Text>
+              <Text style={[styles.rowSub, { color: c.muted }]} numberOfLines={1}>
+                {activeProvider?.name}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={15} color={c.muted} />
+          </Pressable>
+        </View>
+
         <SectionHeader icon="cloud" label={t("settings.connection")} sub={t("settings.connectionSub")} />
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
           {settings.providers.map((provider, index) => {
@@ -223,6 +243,13 @@ export function SettingsScreen() {
       </ScrollView>
 
       <ProviderDialog visible={dialogOpen} editing={editing} onClose={() => setDialogOpen(false)} />
+      {activeProvider ? (
+        <ProviderModelSheet
+          provider={activeProvider}
+          visible={modelSheetOpen}
+          onClose={() => setModelSheetOpen(false)}
+        />
+      ) : null}
 
       <Sheet visible={confirmRemove !== null} title={t("message.delete")} onClose={() => setConfirmRemove(null)}>
         <Text style={{ color: c.muted, fontSize: 14, marginBottom: 14 }}>

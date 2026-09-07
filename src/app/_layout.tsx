@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { I18nProvider } from "../i18n";
 import { StoreProvider, useStore } from "../store";
 import { ThemeProvider, useTheme } from "../theme";
@@ -40,9 +41,11 @@ function Root() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <StoreProvider>
-        <Root />
-      </StoreProvider>
+      <KeyboardProvider>
+        <StoreProvider>
+          <Root />
+        </StoreProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }

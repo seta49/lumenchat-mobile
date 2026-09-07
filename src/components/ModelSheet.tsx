@@ -1,117 +1,133 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useI18n } from "../i18n";
-import { getActiveProvider, getProvider, resolveModelInfo } from "../services/providers";
+import { getActiveProvider, getProvider } from "../services/providers";
+import { fetchProviderModels } from "../services/models";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
-import type { ThinkingLevel } from "../types/chat";
+import { ThinkingSheet } from "./ThinkingSheet";
 import { Sheet } from "./Sheet";
 
-const THINK_LEVELS: ThinkingLevel[] = ["off", "low", "medium", "high", "max"];
-const THINK_KEYS: Record<ThinkingLevel, "chat.thinkingOff" | "chat.thinkingLow" | "chat.thinkingMedium" | "chat.thinkingHigh" | "chat.thinkingMax"> = {
-  off: "chat.thinkingOff",
-  low: "chat.thinkingLow",
-  medium: "chat.thinkingMedium",
-  high: "chat.thinkingHigh",
-  max: "chat.thinkingMax",
-};
-
-/** Dropdown pemilih model ala Gemini: daftar model + subtitle blurb +
- * separator + baris Penalaran (cycle thinking level) + custom model. */
-export function ModelSheet({
-  visible,
-  onClose,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  thinkingOn?: boolean;
-}) {
-  const { settings, setModel, setThinking } = useStore();
+/** Dropdown pemilih model: fetch SEMUA model dari GET /models (fallback ke
+ * template kalau gagal) — id polos tanpa label — + baris Reasoning → popup. */
+export function ModelSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { settings, setModel } = useStore();
   const { c } = useTheme();
   const { t } = useI18n();
-  const [custom, setCustom] = useState("");
+  const [models, setModels] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [reasoningOpen, setReasoningOpen] = useState(false);
 
   const provider = getActiveProvider(settings);
   const template = getProvider(provider.kind);
-  const currentLevel = provider.thinking ?? "off";
-  const nextLevel = THINK_LEVELS[(THINK_LEVELS.indexOf(currentLevel) + 1) % THINK_LEVELS.length];
+
+  // Fetch daftar model tiap kali sheet dibuka (pakai cache di services/models).
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    setLoading(true);
+    void fetchProviderModels(provider).then((list) => {
+      if (!cancelled) {
+        setModels(list);
+        setLoading(false);
+        setError(list === null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, provider]);
 
   const pick = (model: string) => {
     const clean = model.trim();
     if (clean) setModel(clean);
-    setCustom("");
     onClose();
   };
 
+  // Custom model yang tidak ada di list tetap tampil di atas (dipilih).
+  const list = models ?? template.models;
+  const all = list.includes(provider.model) ? list : [provider.model, ...list];
+
   return (
-    <Sheet visible={visible} title={t("chat.model")} onClose={onClose}>
-      <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-        {template.models.length === 0 ? (
-          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 8 }}>
-            {t("settings.modelPlaceholder")}
-          </Text>
-        ) : null}
-        {template.models.map((m) => {
-          const { label, blurbKey } = resolveModelInfo(provider.kind, m);
-          const selected = provider.model === m;
-          return (
-            <Pressable
-              key={m}
-              onPress={() => pick(m)}
-              style={[styles.row, selected && { backgroundColor: c.panel }]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.rowTitle, { color: c.text }]}>{label}</Text>
-                <Text style={[styles.rowSub, { color: c.muted }]}>
-                  {blurbKey ? t(blurbKey as never) : m}
+    <>
+      <Sheet visible={visible} title={provider.name} onClose={onClose}>
+        <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            <Text style={[styles.status, { color: c.muted }]}>{t("settings.testing")}</Text>
+          ) : null}
+          {error && !loading ? (
+            <Text style={[styles.status, { color: c.danger }]}>{t("model.listOffline")}</Text>
+          ) : null}
+
+          {all.map((m) => {
+            const selected = provider.model === m;
+            return (
+              <Pressable
+                key={m}
+                onPress={() => pick(m)}
+                style={[styles.row, selected && { backgroundColor: c.panel }]}
+              >
+                <Text style={[styles.rowTitle, { color: c.text, flex: 1 }]} numberOfLines={1}>
+                  {m}
                 </Text>
-              </View>
-              {selected ? <Ionicons name="checkmark" size={18} color={c.accent} /> : null}
-            </Pressable>
-          );
-        })}
+                {selected ? <Ionicons name="checkmark" size={18} color={c.accent} /> : null}
+              </Pressable>
+            );
+          })}
 
-        <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
 
-        <Pressable
-          onPress={() => setThinking(nextLevel)}
-          style={styles.row}
-        >
-          <View style={styles.reasonIcon}>
-            <Ionicons name="sparkles" size={15} color={currentLevel !== "off" ? c.accent : c.muted} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.rowTitle, { color: c.text }]}>{t("model.reasoning")}</Text>
-            <Text style={[styles.rowSub, { color: c.muted }]}>{t(THINK_KEYS[currentLevel])}</Text>
-          </View>
-          <Text style={{ fontSize: 12, color: c.muted }}>›</Text>
-        </Pressable>
-
-        <View style={[styles.divider, { backgroundColor: c.border }]} />
-
-        <View style={styles.customRow}>
-          <TextInput
-            value={custom}
-            onChangeText={setCustom}
-            placeholder={t("settings.modelPlaceholder")}
-            placeholderTextColor={c.muted}
-            style={[styles.customInput, { color: c.text, backgroundColor: c.input, borderColor: c.border }]}
-          />
-          <Pressable
-            onPress={() => pick(custom)}
-            style={[styles.customSave, { backgroundColor: c.accent }]}
-          >
-            <Text style={{ color: c.onAccent, fontSize: 13, fontWeight: "600" }}>{t("common.save")}</Text>
+          <Pressable onPress={() => setReasoningOpen(true)} style={styles.row}>
+            <View style={styles.reasonIcon}>
+              <Ionicons
+                name="sparkles"
+                size={15}
+                color={(provider.thinking ?? "off") !== "off" ? c.accent : c.muted}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowTitle, { color: c.text }]}>{t("model.reasoning")}</Text>
+              <Text style={[styles.rowSub, { color: c.muted }]}>
+                {t(("chat.thinking" + capitalize(provider.thinking ?? "off")) as never)}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 14, color: c.muted }}>›</Text>
           </Pressable>
-        </View>
-      </ScrollView>
-    </Sheet>
+
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <View style={styles.customRow}>
+            <Pressable
+              onPress={() => void fetchProviderModels(provider, true).then((l) => {
+                if (l) {
+                  setModels(l);
+                  setError(false);
+                } else {
+                  setError(true);
+                }
+              })}
+              style={[styles.refreshBtn, { borderColor: c.border }]}
+            >
+              <Ionicons name="refresh-outline" size={15} color={c.muted} />
+              <Text style={{ fontSize: 12, color: c.muted }}>{t("model.refresh")}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </Sheet>
+
+      <ThinkingSheet visible={reasoningOpen} onClose={() => setReasoningOpen(false)} />
+    </>
   );
 }
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 const styles = StyleSheet.create({
-  list: { maxHeight: 380 },
+  list: { maxHeight: 420 },
+  status: { fontSize: 13, paddingHorizontal: 10, paddingVertical: 8 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -126,20 +142,18 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 8 },
-  customRow: { flexDirection: "row", gap: 8, marginTop: 4, marginBottom: 8 },
-  customInput: {
-    flex: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
-    borderWidth: StyleSheet.hairlineWidth,
+  customRow: { flexDirection: "row", justifyContent: "center", marginTop: 4, marginBottom: 8 },
+  refreshBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  customSave: { borderRadius: 12, paddingHorizontal: 14, justifyContent: "center" },
 });

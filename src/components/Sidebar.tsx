@@ -1,7 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
@@ -18,8 +29,8 @@ function messageText(msg: { content: unknown }): string {
   return "";
 }
 
-/** Drawer riwayat v2 ala ChatGPT/Gemini: pill "Chat baru", search inline,
- * list polos (long-press = aksi), footer profil + gear. */
+/** Drawer riwayat v2: slide dari KIRI nempel mepet, backdrop fade,
+ * pill chat baru + search + list polos (long-press = aksi), footer profil. */
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const {
     threads,
@@ -39,6 +50,39 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Slide dari kiri: panel mulai -width → 0. Struktur: [panel][backdrop flex]
+  // dalam row — panel nempel mepet kiri layar, sisanya backdrop.
+  const width = Math.min(Dimensions.get("window").width * 0.86, 360);
+  const slide = useRef(new Animated.Value(-width)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+  const [rendered, setRendered] = useState(open);
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      Animated.parallel([
+        Animated.timing(slide, {
+          toValue: 0,
+          duration: 240,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
+      ]).start();
+    } else if (rendered) {
+      Animated.parallel([
+        Animated.timing(slide, {
+          toValue: -width,
+          duration: 200,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fade, { toValue: 0, duration: 180, useNativeDriver: true }),
+      ]).start(() => setRendered(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const filtered = query.trim()
     ? threads.filter(
@@ -71,15 +115,33 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     .slice(0, 2)
     .join("") || "L").toUpperCase();
 
+  if (!rendered) {
+    return (
+      <>
+        <Sheet
+          visible={renameId !== null}
+          title={t("sidebar.chatTitlePlaceholder")}
+          onClose={() => setRenameId(null)}
+        >
+          {null}
+        </Sheet>
+      </>
+    );
+  }
+
   return (
     <>
-      <Modal transparent visible={open} animationType="slide" onRequestClose={onClose}>
+      <Modal transparent visible={rendered} animationType="none" onRequestClose={onClose}>
         <View style={styles.container}>
-          <Pressable style={styles.backdrop} onPress={onClose} />
-          <View
+          <Animated.View
             style={[
               styles.panel,
-              { backgroundColor: c.bg, borderLeftColor: c.border, paddingTop: insets.top + 8 },
+              {
+                backgroundColor: c.bg,
+                borderRightColor: c.border,
+                paddingTop: insets.top + 8,
+                transform: [{ translateX: slide }],
+              },
             ]}
           >
             <View style={styles.header}>
@@ -145,7 +207,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                         numberOfLines={1}
                         style={[
                           styles.threadTitle,
-                          { color: active ? c.text : c.text, fontWeight: active ? "700" : "400" },
+                          { color: c.text, fontWeight: active ? "700" : "400" },
                         ]}
                       >
                         {item.title}
@@ -182,7 +244,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                 <Ionicons name="settings-outline" size={19} color={c.text} />
               </Pressable>
             </View>
-          </View>
+          </Animated.View>
+
+          <Animated.View style={[styles.backdropWrap, { opacity: fade }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          </Animated.View>
         </View>
       </Modal>
 
@@ -254,8 +320,14 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: "row" },
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
-  panel: { width: "86%", maxWidth: 360, height: "100%", borderLeftWidth: StyleSheet.hairlineWidth },
+  // Panel anak pertama = mepet kiri; lebar 86% (sisanya backdrop terlihat di kanan, ala ChatGPT).
+  panel: {
+    width: "86%",
+    maxWidth: 360,
+    height: "100%",
+    borderRightWidth: StyleSheet.hairlineWidth,
+  },
+  backdropWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
   header: {
     flexDirection: "row",
     alignItems: "center",

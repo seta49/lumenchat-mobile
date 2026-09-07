@@ -71,12 +71,19 @@ const en = {
   // Typing indicator
   "typing.thinking": "Lumen is thinking…",
 
+  // Attach (v2.3)
+  "chat.attach": "Attach",
+  "chat.attachFile": "Attach file",
+  "file.attached": "I attached {n} files below for context.",
+
   // Model dropdown (v2)
   "model.blurb.flash": "Fastest answers",
   "model.blurb.deep": "Advanced reasoning",
   "model.blurb.code": "Tuned for code",
   "model.blurb.vision": "Multimodal — sees images",
   "model.reasoning": "Reasoning",
+  "model.listOffline": "Could not load the model list — showing saved defaults.",
+  "model.refresh": "Refresh list",
 
   // Home / composer (v2)
   "chat.greeting": "Hey {name}, what's on your mind?",
@@ -127,6 +134,8 @@ const en = {
   "settings.apiKeyPlaceholder": "your_api_key",
   "settings.model": "Model",
   "settings.modelPlaceholder": "e.g. deepseek-v4-flash",
+  "settings.defaultModel": "Default model",
+  "settings.defaultModelHint": "Model used for new chats — pick from the provider's list.",
   "settings.apiFormat": "API format",
   "settings.apiFormatOpenAI": "OpenAI-compatible (chat/completions)",
   "settings.apiFormatAnthropic": "Anthropic (messages)",
@@ -238,12 +247,19 @@ const id: Record<TranslationKey, string> = {
   // Typing indicator
   "typing.thinking": "Lumen sedang berpikir…",
 
+  // Attach (v2.3)
+  "chat.attach": "Lampirkan",
+  "chat.attachFile": "Lampirkan file",
+  "file.attached": "Aku lampirkan {n} file di bawah sebagai konteks.",
+
   // Model dropdown (v2)
   "model.blurb.flash": "Jawaban tercepat",
   "model.blurb.deep": "Penalaran canggih",
   "model.blurb.code": "Disetel untuk kode",
   "model.blurb.vision": "Multimodal — bisa lihat gambar",
   "model.reasoning": "Penalaran",
+  "model.listOffline": "Gagal memuat daftar model — menampilkan daftar tersimpan.",
+  "model.refresh": "Muat ulang",
 
   // Home / composer (v2)
   "chat.greeting": "Halo {name}, apa yang kamu pikirkan?",
@@ -294,6 +310,8 @@ const id: Record<TranslationKey, string> = {
   "settings.apiKeyPlaceholder": "your_api_key",
   "settings.model": "Model",
   "settings.modelPlaceholder": "mis. deepseek-v4-flash",
+  "settings.defaultModel": "Model default",
+  "settings.defaultModelHint": "Model dipakai buat chat baru — pilih dari daftar provider.",
   "settings.apiFormat": "Format API",
   "settings.apiFormatOpenAI": "Kompatibel OpenAI (chat/completions)",
   "settings.apiFormatAnthropic": "Anthropic (messages)",

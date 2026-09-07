@@ -5,12 +5,14 @@ import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
 import { PROVIDERS, providerLabel } from "../services/providers";
+import { fetchProviderModels } from "../services/models";
 import { testProviderConnection } from "../services/ai";
 import { newId } from "../utils/id";
 import type { ProviderApiFormat, ProviderConfig, ProviderId } from "../types/chat";
 import { Sheet } from "./Sheet";
 
-/** Dialog tambah/ubah provider: pilih tipe → isi kredensial → tes → simpan. */
+/** Dialog tambah/ubah provider. Model TIDAK diisi manual — dipilih di pengaturan
+ * "Default model" setelah provider disimpan (sheet model per provider). */
 export function ProviderDialog({
   visible,
   editing,
@@ -28,7 +30,6 @@ export function ProviderDialog({
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("");
   const [apiFormat, setApiFormat] = useState<ProviderApiFormat>("openai");
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -43,7 +44,6 @@ export function ProviderDialog({
       setName(editing.name);
       setBaseUrl(editing.baseUrl);
       setApiKey(editing.apiKey);
-      setModel(editing.model);
       setApiFormat(editing.apiFormat);
     } else {
       const def = PROVIDERS[0];
@@ -51,7 +51,6 @@ export function ProviderDialog({
       setName(def.label);
       setBaseUrl(def.baseUrl);
       setApiKey("");
-      setModel(def.defaultModel);
       setApiFormat(def.apiFormat);
     }
     setShowKey(false);
@@ -67,7 +66,6 @@ export function ProviderDialog({
     setKind(k);
     setName(def.label);
     setBaseUrl(def.baseUrl);
-    setModel(def.defaultModel);
     setApiFormat(def.apiFormat);
   };
 
@@ -75,14 +73,14 @@ export function ProviderDialog({
     setTesting(true);
     setTestResult(null);
     const res = await testProviderConnection(
-      { baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), model: model.trim() || "ping", apiFormat },
+      { baseUrl: baseUrl.trim(), apiKey, model: "ping", apiFormat },
       lang,
     );
     setTestResult(res.message);
     setTesting(false);
   };
 
-  const canSave = baseUrl.trim().length > 0 && model.trim().length > 0;
+  const canSave = baseUrl.trim().length > 0;
 
   const save = () => {
     if (!canSave) {
@@ -94,7 +92,7 @@ export function ProviderDialog({
       name: name.trim() || providerLabel(kind),
       baseUrl: baseUrl.trim(),
       apiKey: apiKey.trim(),
-      model: model.trim(),
+      model: editing?.model ?? "",
       apiFormat,
       thinking: editing?.thinking,
     };
@@ -127,7 +125,7 @@ export function ProviderDialog({
               >
                 <Text
                   numberOfLines={1}
-                  style={{ fontSize: 12, color: kind === p.id ? c.accent : c.text }}
+                  style={{ fontSize: 13, fontWeight: "600", color: kind === p.id ? c.accent : c.text }}
                 >
                   {p.label}
                 </Text>
@@ -136,15 +134,6 @@ export function ProviderDialog({
           </View>
         ) : null}
 
-        <Field label={t("settings.providerName")}>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder={providerLabel(kind)}
-            placeholderTextColor={c.muted}
-            style={[styles.input, { color: c.text, backgroundColor: c.input, borderColor: c.border }]}
-          />
-        </Field>
         <Field label={t("settings.baseUrl")}>
           <TextInput
             value={baseUrl}
@@ -182,17 +171,8 @@ export function ProviderDialog({
             </Pressable>
           </View>
         </Field>
-        <Field label={t("settings.model")}>
-          <TextInput
-            value={model}
-            onChangeText={setModel}
-            placeholder={t("settings.modelPlaceholder")}
-            placeholderTextColor={c.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={[styles.input, { color: c.text, backgroundColor: c.input, borderColor: c.border }]}
-          />
-        </Field>
+
+        {!editing || apiFormat === editing.apiFormat ? null : null}
         <Field label={t("settings.apiFormat")}>
           <View style={styles.segment}>
             {(["openai", "anthropic"] as const).map((fmt) => (
@@ -201,14 +181,12 @@ export function ProviderDialog({
                 onPress={() => setApiFormat(fmt)}
                 style={[
                   styles.segmentBtn,
-                  {
-                    backgroundColor: apiFormat === fmt ? c.accent : "transparent",
-                  },
+                  { backgroundColor: apiFormat === fmt ? c.accent : "transparent" },
                 ]}
               >
                 <Text
                   style={{
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: "600",
                     color: apiFormat === fmt ? c.onAccent : c.muted,
                   }}
@@ -254,13 +232,68 @@ export function ProviderDialog({
             { backgroundColor: canSave ? c.accent : c.border },
           ]}
         >
-          <Text style={{ color: canSave ? c.onAccent : c.muted, fontSize: 14, fontWeight: "700" }}>
+          <Text style={{ color: canSave ? c.onAccent : c.muted, fontSize: 15, fontWeight: "700" }}>
             {t("settings.saveProvider")}
           </Text>
         </Pressable>
       </ScrollView>
     </Sheet>
   );
+}
+
+/** Sheet pilih model untuk satu provider (fetch GET /models, fallback template). */
+export function ProviderModelSheet({
+  provider,
+  visible,
+  onClose,
+}: {
+  provider: ProviderConfig;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const { setModel } = useStore();
+  const { t } = useI18n();
+  const { c } = useTheme();
+  const [models, setModels] = useState<string[] | null>(null);
+  const template = getProviderModels(provider.kind);
+
+  useEffect(() => {
+    if (!visible) return;
+    void fetchProviderModels(provider).then(setModels);
+  }, [visible, provider]);
+
+  const list = models ?? template;
+  const all = list.includes(provider.model) || !provider.model ? list : [provider.model, ...list];
+
+  return (
+    <Sheet visible={visible} onClose={onClose} title={t("settings.defaultModel")}>
+      <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+        {!models ? (
+          <Text style={[styles.status, { color: c.muted }]}>{t("settings.testing")}</Text>
+        ) : null}
+        {all.map((m: string) => (
+          <Pressable
+            key={m}
+            onPress={() => {
+              setModel(m);
+              onClose();
+            }}
+            style={[styles.row, provider.model === m && { backgroundColor: c.panel }]}
+          >
+            <Text style={[styles.rowTitle, { color: c.text, flex: 1 }]} numberOfLines={1}>
+              {m}
+            </Text>
+            {provider.model === m ? <Ionicons name="checkmark" size={18} color={c.accent} /> : null}
+          </Pressable>
+        ))}
+      </ScrollView>
+    </Sheet>
+  );
+}
+
+function getProviderModels(kind: ProviderId): string[] {
+  const def = PROVIDERS.find((p) => p.id === kind);
+  return def ? def.models : [];
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -275,54 +308,64 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 0 },
-  hint: { fontSize: 12, marginBottom: 12 },
-  kindWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 },
+  list: { maxHeight: 380 },
+  hint: { fontSize: 13, marginBottom: 14, lineHeight: 18 },
+  kindWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
   kindChip: {
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    maxWidth: "100%",
-  },
-  field: { marginBottom: 10 },
-  fieldLabel: { fontSize: 12, marginBottom: 5, fontWeight: "600" },
-  input: {
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
+    paddingVertical: 7,
+  },
+  field: { marginBottom: 14 },
+  fieldLabel: { fontSize: 12, marginBottom: 6, fontWeight: "700", letterSpacing: 0.2 },
+  input: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 15,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  keyRow: { flexDirection: "row", gap: 6 },
+  keyRow: { flexDirection: "row", gap: 8 },
   keyInput: { flex: 1 },
   eyeBtn: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    paddingHorizontal: 10,
+    borderRadius: 14,
+    paddingHorizontal: 12,
     justifyContent: "center",
   },
-  segment: { flexDirection: "row", gap: 6 },
+  segment: { flexDirection: "row", gap: 8 },
   segmentBtn: {
     flex: 1,
-    paddingVertical: 9,
-    borderRadius: 12,
+    paddingVertical: 11,
+    borderRadius: 14,
     alignItems: "center",
   },
-  testRow: { marginTop: 4 },
+  testRow: { marginTop: 6 },
   testBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 9,
-  },
-  testResult: { fontSize: 12, marginTop: 8 },
-  saveBtn: {
-    marginTop: 14,
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 11,
+  },
+  testResult: { fontSize: 13, marginTop: 10 },
+  saveBtn: {
+    marginTop: 16,
+    borderRadius: 16,
+    paddingVertical: 14,
     alignItems: "center",
   },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+  },
+  status: { fontSize: 13, paddingVertical: 8 },
+  rowTitle: { fontSize: 15, fontWeight: "600" },
 });
