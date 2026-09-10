@@ -40,6 +40,9 @@ interface StoreValue {
   /** Ganti isi pesan user & hapus semua pesan setelahnya, lalu stream jawaban baru. */
   editAndResend: (userMessageId: string, text: string) => Promise<void>;
   deleteMessage: (messageId: string) => void;
+  clearAllChats: () => void;
+  importThreads: (imported: ChatThread[]) => void;
+  setThreadSystemPrompt: (threadId: string, systemPrompt?: string) => void;
   stop: () => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   addProvider: (config: ProviderConfig) => void;
@@ -155,6 +158,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const thread = stateRef.current.threads.find((t) => t.id === threadId);
+      const withSystem: AIMessage[] = thread?.systemPrompt?.trim()
+        ? [{ role: "system", content: thread.systemPrompt.trim() }, ...historyMessages]
+        : historyMessages;
+
       const controller = new AbortController();
       abortRef.current = controller;
       setStreamingId(assistantMsg.id);
@@ -192,7 +200,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await streamProviderMessage({
           settings: provider,
           lang: currentSettings.language,
-          messages: historyMessages,
+          messages: withSystem,
           signal: controller.signal,
           callbacks: { onDelta: appendDelta, onUsage: setUsage },
         });
@@ -243,7 +251,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let threadId = currentActive;
     let existing = currentThreads.find((t) => t.id === threadId) ?? null;
 
-    const userMsg: ChatMessage = { id: newId(), role: "user", content: parts, createdAt: Date.now() };
+    // Teks murni → string (lebih kompatibel dgn banyak provider OpenAI-compatible)
+    const content =
+      parts.length === 1 && parts[0].type === "text"
+        ? (parts[0].text ?? "")
+        : parts;
+    const userMsg: ChatMessage = { id: newId(), role: "user", content, createdAt: Date.now() };
     const assistantMsg: ChatMessage = {
       id: newId(),
       role: "assistant",
@@ -273,9 +286,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       );
     }
 
-    const historyMessages: AIMessage[] = existing.messages
-      .filter((m) => m.id !== userMsg.id && m.id !== assistantMsg.id)
-      .map((m) => ({ role: m.role, content: m.content }));
+    // History = pesan lama + pesan user BARU. Placeholder assistantMsg tidak ikut.
+    // (existing.messages utk thread baru sudah include userMsg; utk thread lama belum.)
+    const historyMessages: AIMessage[] = [
+      ...existing.messages
+        .filter((m) => m.id !== assistantMsg.id && m.id !== userMsg.id)
+        .map((m): AIMessage => ({ role: m.role, content: m.content })),
+      { role: "user", content: userMsg.content },
+    ];
 
     await streamAssistant(threadId!, assistantMsg, historyMessages, currentSettings);
   }, [streamAssistant]);
@@ -322,9 +340,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const thread = currentThreads.find((t) => t.messages.some((m) => m.id === userMessageId));
       if (!thread) return;
       const idx = thread.messages.findIndex((m) => m.id === userMessageId);
+      const original = thread.messages[idx];
+      const originalImages = Array.isArray(original.content)
+        ? original.content.filter((p) => p.type === "image_url")
+        : [];
+      const parts: ContentPart[] = [];
+      if (text.trim()) {
+        parts.push({ type: "text", text: text.trim() });
+      }
+      parts.push(...originalImages);
       const edited: ChatMessage = {
-        ...thread.messages[idx],
-        content: text.trim(),
+        ...original,
+        content: parts.length === 1 && parts[0].type === "text" ? text.trim() : parts,
         createdAt: Date.now(),
       };
       const fresh: ChatMessage = {
@@ -356,6 +383,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ts.map((t) =>
         t.messages.some((m) => m.id === messageId)
           ? { ...t, messages: t.messages.filter((m) => m.id !== messageId) }
+          : t,
+      ),
+    );
+  }, []);
+
+  const clearAllChats = useCallback(() => {
+    setThreads([]);
+    setActiveThreadId(null);
+  }, []);
+
+  const importThreads = useCallback((imported: ChatThread[]) => {
+    if (!imported.length) return;
+    setThreads((ts) => {
+      const next = [...imported, ...ts];
+      return next;
+    });
+    setActiveThreadId(imported[0].id);
+  }, []);
+
+  const setThreadSystemPrompt = useCallback((threadId: string, systemPrompt?: string) => {
+    setThreads((ts) =>
+      ts.map((t) =>
+        t.id === threadId
+          ? { ...t, systemPrompt: systemPrompt?.trim() || undefined, updatedAt: Date.now() }
           : t,
       ),
     );
@@ -443,6 +494,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       regenerate,
       editAndResend,
       deleteMessage,
+      clearAllChats,
+      importThreads,
+      setThreadSystemPrompt,
       stop,
       updateSettings,
       addProvider,
@@ -467,6 +521,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       regenerate,
       editAndResend,
       deleteMessage,
+      clearAllChats,
+      importThreads,
+      setThreadSystemPrompt,
       stop,
       updateSettings,
       addProvider,

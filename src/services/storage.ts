@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { createProviderConfig, getProvider } from "./providers";
 import type {
   AppSettings,
@@ -11,8 +12,10 @@ import type {
 import { newId } from "../utils/id";
 
 // Versi mobile: data disimpan di AsyncStorage (pengganti localStorage web).
+// API key di SecureStore (Android Keystore) — tidak lagi di AsyncStorage.
 const SETTINGS_KEY = "lumen-ai.settings.v5";
 const CHATS_KEY = "lumen-ai.chats.v2";
+const SECURE_KEY_PREFIX = "lumen.key.";
 
 // Legacy keys (one-time migration):
 //  - v4 era: multi-provider, tanpa accent/profileName
@@ -43,6 +46,49 @@ type LegacyHermesSettings = Partial<{
   theme: "dark" | "light";
   language: "en" | "id";
 }>;
+
+function secureId(id: string): string {
+  return `${SECURE_KEY_PREFIX}${id}`;
+}
+
+async function storeApiKey(id: string, key: string): Promise<void> {
+  try {
+    if (key) {
+      await SecureStore.setItemAsync(secureId(id), key);
+    } else {
+      await SecureStore.deleteItemAsync(secureId(id));
+    }
+  } catch {
+    // SecureStore unavailable (web/simulator edge) — fallback ke tempat kosong.
+  }
+}
+
+async function loadApiKey(id: string): Promise<string> {
+  try {
+    return (await SecureStore.getItemAsync(secureId(id))) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Pindahkan apiKey provider ke SecureStore; return provider tanpa key (untuk AsyncStorage). */
+async function stripAndStoreKeys(providers: ProviderConfig[]): Promise<ProviderConfig[]> {
+  const cleaned: ProviderConfig[] = [];
+  for (const p of providers) {
+    await storeApiKey(p.id, p.apiKey);
+    cleaned.push({ ...p, apiKey: "" });
+  }
+  return cleaned;
+}
+
+async function hydrateKeys(providers: ProviderConfig[]): Promise<ProviderConfig[]> {
+  return Promise.all(
+    providers.map(async (p) => ({
+      ...p,
+      apiKey: p.apiKey || (await loadApiKey(p.id)),
+    })),
+  );
+}
 
 function safeParse<T>(value: string | null, fallback: T): T {
   if (!value) {
@@ -195,44 +241,41 @@ export async function loadSettings(): Promise<AppSettings> {
       if (v4.language === "en" || v4.language === "id") out.language = v4.language;
     } else {
       // v3 (single provider fields)
-      for (const key of ["lumen-ai.settings.v3"]) {
-      migrated = fromV3Settings(safeParse<LegacyV3Settings>(await AsyncStorage.getItem(key), {}));
-      if (migrated) {
-        break;
-      }
-    }
+      migrated = fromV3Settings(
+        safeParse<LegacyV3Settings>(await AsyncStorage.getItem("lumen-ai.settings.v3"), {}),
+      );
 
-    // v1/v2 (Hermes era)
-    if (!migrated) {
-      for (const key of ["lumen-ai.settings.v2", "lumen-ai.settings"]) {
-        migrated = fromHermesSettings(
-          safeParse<LegacyHermesSettings>(await AsyncStorage.getItem(key), {}),
-        );
-        if (migrated) {
-          break;
+      // v1/v2 (Hermes era)
+      if (!migrated) {
+        for (const key of ["lumen-ai.settings.v2", "lumen-ai.settings"]) {
+          migrated = fromHermesSettings(
+            safeParse<LegacyHermesSettings>(await AsyncStorage.getItem(key), {}),
+          );
+          if (migrated) {
+            break;
+          }
         }
       }
-    }
 
-    if (migrated) {
-      out.providers = [migrated];
-      out.activeProviderId = migrated.id;
-    }
+      if (migrated) {
+        out.providers = [migrated];
+        out.activeProviderId = migrated.id;
+      }
 
-    // Carry over theme/language from any legacy shape.
-    for (const key of LEGACY_SETTINGS_KEYS) {
-      const legacy = safeParse<LegacyV3Settings | LegacyHermesSettings>(
-        await AsyncStorage.getItem(key),
-        {},
-      );
-      if (legacy && (legacy.theme === "dark" || legacy.theme === "light")) {
-        out.theme = legacy.theme;
+      // Carry over theme/language from any legacy shape.
+      for (const key of LEGACY_SETTINGS_KEYS) {
+        const legacy = safeParse<LegacyV3Settings | LegacyHermesSettings>(
+          await AsyncStorage.getItem(key),
+          {},
+        );
+        if (legacy && (legacy.theme === "dark" || legacy.theme === "light")) {
+          out.theme = legacy.theme;
+        }
+        if (legacy && (legacy.language === "en" || legacy.language === "id")) {
+          out.language = legacy.language;
+        }
+        break;
       }
-      if (legacy && (legacy.language === "en" || legacy.language === "id")) {
-        out.language = legacy.language;
-      }
-      break;
-    }
     }
   }
 
@@ -243,11 +286,18 @@ export async function loadSettings(): Promise<AppSettings> {
     out.profileName = stored.profileName;
   }
 
+  // Ambil API key dari SecureStore (migrasi: kalau masih ada key di JSON, pindahkan).
+  out.providers = await hydrateKeys(out.providers);
+
   return out;
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  const providers = await stripAndStoreKeys(settings.providers);
+  await AsyncStorage.setItem(
+    SETTINGS_KEY,
+    JSON.stringify({ ...settings, providers }),
+  );
 }
 
 export async function loadChats(): Promise<ChatThread[]> {

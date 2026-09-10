@@ -2,13 +2,23 @@
   "expo": {
     "name": "Lumen",
     "slug": "lumenchat-mobile",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "lumenchat",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#000000",
+      "barStyle": "light-content",
+      "translucent": false
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#000000",
+      "barStyle": "light-content",
+      "visible": "immersive"
     },
     "android": {
       "package": "com.setab49.lumen",
@@ -33,7 +43,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

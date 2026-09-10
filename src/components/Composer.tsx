@@ -1,23 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
-import * as FS from "expo-file-system";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { File } from "expo-file-system";
+import { useEffect, useState } from "react";
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "../i18n";
+import { getActiveProvider } from "../services/providers";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
 import { pickAndCompressImage } from "../utils/image";
 import type { ContentPart } from "../types/chat";
 import { Sheet } from "./Sheet";
+import { ThinkingSheet } from "./ThinkingSheet";
 
 interface FileAttachment {
   name: string;
   text: string;
 }
 
-/** Composer v2.3: pill [+][input][mic][send], keyboard-aware native,
+/** Composer: pill [+][input][reasoning][send], keyboard-aware native,
  * attach gambar + dokumen (txt/md/json/csv/kode). */
 export function Composer() {
   const { settings, streamingId, send, stop } = useStore();
@@ -28,6 +30,31 @@ export function Composer() {
   const [images, setImages] = useState<ContentPart[]>([]);
   const [files, setFiles] = useState<FileAttachment[]>([]);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [kbOpen, setKbOpen] = useState(false);
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKbOpen(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKbOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  const provider = getActiveProvider(settings);
+  const thinking = provider?.thinking ?? "off";
+  const thinkingOn = thinking !== "off";
+  const thinkingLabel =
+    thinking === "off"
+      ? t("chat.thinkingOff")
+      : thinking === "low"
+        ? t("chat.thinkingLow")
+        : thinking === "medium"
+          ? t("chat.thinkingMedium")
+          : thinking === "high"
+            ? t("chat.thinkingHigh")
+            : t("chat.thinkingMax");
 
   const streaming = streamingId !== null;
   const canSend = text.trim().length > 0 || images.length > 0 || files.length > 0;
@@ -53,7 +80,6 @@ export function Composer() {
           "text/*",
           "application/json",
           "text/csv",
-          "application/pdf",
           "text/markdown",
           "application/javascript",
           "text/x-python",
@@ -63,10 +89,8 @@ export function Composer() {
         return;
       }
       const asset = res.assets[0];
-      // Baca sebagai teks (untuk PDF/binary besar, isi dipotong biar hemat).
-      const content = await FS.readAsStringAsync(asset.uri, {
-        encoding: FS.EncodingType.UTF8,
-      });
+      // Baca sebagai teks (isi dipotong biar hemat).
+      const content = await new File(asset.uri).text();
       const clipped = content.length > 60_000 ? content.slice(0, 60_000) : content;
       setFiles((f) => [...f, { name: asset.name ?? "file", text: clipped }]);
     } catch {
@@ -102,7 +126,17 @@ export function Composer() {
     n > 1 ? `${t("file.attached", { n })}\n\n` : "";
 
   return (
-    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+    <View
+      style={[
+        styles.wrap,
+        {
+          backgroundColor: c.bg,
+          borderTopColor: c.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          paddingBottom: kbOpen ? 8 : Math.max(insets.bottom, 10),
+        },
+      ]}
+    >
       {images.length > 0 || files.length > 0 ? (
         <View style={styles.thumbRow}>
           {images.map((part, i) => (
@@ -149,29 +183,46 @@ export function Composer() {
           style={[styles.input, { color: c.text }]}
         />
 
+        <Pressable
+          onPress={() => setReasoningOpen(true)}
+          hitSlop={6}
+          style={[
+            styles.reasonChip,
+            {
+              backgroundColor: thinkingOn ? c.accent + "1f" : c.input,
+              borderColor: thinkingOn ? c.accent + "55" : c.border,
+            },
+          ]}
+          accessibilityLabel={t("model.reasoning")}
+        >
+          <Ionicons
+            name="sparkles-outline"
+            size={14}
+            color={thinkingOn ? c.accent : c.muted}
+          />
+          <Text
+            numberOfLines={1}
+            style={[styles.reasonChipText, { color: thinkingOn ? c.accent : c.muted }]}
+          >
+            {thinkingLabel}
+          </Text>
+        </Pressable>
+
         {streaming ? (
           <Pressable onPress={stop} style={[styles.sendBtn, { backgroundColor: c.danger }]}>
             <Ionicons name="stop" size={18} color="#ffffff" />
           </Pressable>
         ) : (
-          <>
-            {canSend ? null : (
-              <Pressable style={[styles.micBtn, { backgroundColor: c.input }]} hitSlop={6}>
-                <Ionicons name="mic-outline" size={19} color={c.muted} />
-              </Pressable>
-            )}
-            <Pressable
-              onPress={onSend}
-              disabled={!canSend}
-              style={[styles.sendBtn, { backgroundColor: canSend ? c.accent : c.input }]}
-            >
-              <Ionicons name="arrow-up" size={19} color={canSend ? c.onAccent : c.muted} />
-            </Pressable>
-          </>
+          <Pressable
+            onPress={onSend}
+            disabled={!canSend}
+            style={[styles.sendBtn, { backgroundColor: canSend ? c.accent : c.input }]}
+          >
+            <Ionicons name="arrow-up" size={19} color={canSend ? c.onAccent : c.muted} />
+          </Pressable>
         )}
       </View>
 
-      {/* Sheet attach: image + dokumen (voice dipindah ke pill). */}
       <Sheet visible={toolsOpen} title={t("chat.attach")} onClose={() => setToolsOpen(false)}>
         <Pressable onPress={attach} style={styles.toolRow}>
           <Ionicons name="images-outline" size={20} color={c.text} />
@@ -182,6 +233,8 @@ export function Composer() {
           <Text style={{ color: c.text, fontSize: 14 }}>{t("chat.attachFile")}</Text>
         </Pressable>
       </Sheet>
+
+      <ThinkingSheet visible={reasoningOpen} onClose={() => setReasoningOpen(false)} />
     </View>
   );
 }
@@ -230,18 +283,27 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   iconBtn: { padding: 8 },
+  reasonChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    maxWidth: 92,
+    flexShrink: 0,
+  },
+  reasonChipText: {
+    fontSize: 11,
+    fontWeight: "600",
+    flexShrink: 1,
+  },
   input: {
     flex: 1,
     maxHeight: 96,
     fontSize: 16,
     paddingVertical: 8,
-  },
-  micBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
   },
   sendBtn: {
     width: 40,

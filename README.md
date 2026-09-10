@@ -43,8 +43,9 @@ src/
 ## Catatan v1
 
 - **Mermaid & KaTeX tidak di-port** — diagram mermaid render sebagai code block, rumus sebagai teks. (Web pakai lib browser-only.)
-- **Persona/system prompt per chat & command palette** belum ada di v1 (YAGNI).
-- API key di AsyncStorage — upgrade ke `expo-secure-store` (keychain Android) direncanakan.
+- **Persona/system prompt** bisa di-set per chat lewat long-press thread di sidebar.
+- **Export/import chat** (JSON) ada di Settings.
+- API key disimpan di **expo-secure-store** (Android Keystore), bukan AsyncStorage.
 - `metro.config.js` berisi satu alias `punycode` (dibutuhkan `markdown-it`, dependency `react-native-markdown-display` — modul itu mengimpor builtin Node yang tidak ada di Metro).
 
 ## Lisensi

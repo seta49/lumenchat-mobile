@@ -39,6 +39,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     deleteThread,
     renameThread,
     setActiveThread,
+    setThreadSystemPrompt,
     settings,
   } = useStore();
   const { t } = useI18n();
@@ -49,6 +50,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const [searching, setSearching] = useState(false);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [personaDraft, setPersonaDraft] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Slide dari kiri: panel mulai -width → 0. Struktur: [panel][backdrop flex]
@@ -92,13 +94,17 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       )
     : threads;
 
-  const openRename = (id: string, title: string) => {
+  const openRename = (id: string, title: string, systemPrompt?: string) => {
     setRenameId(id);
     setRenameValue(title);
+    setPersonaDraft(systemPrompt ?? "");
   };
   const saveRename = () => {
-    if (renameId && renameValue.trim()) {
-      renameThread(renameId, renameValue.trim());
+    if (renameId) {
+      if (renameValue.trim()) {
+        renameThread(renameId, renameValue.trim());
+      }
+      setThreadSystemPrompt(renameId, personaDraft.trim() || undefined);
     }
     setRenameId(null);
   };
@@ -199,7 +205,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                         setActiveThread(item.id);
                         onClose();
                       }}
-                      onLongPress={() => openRename(item.id, item.title)}
+                      onLongPress={() => openRename(item.id, item.title, item.systemPrompt)}
                       delayLongPress={350}
                       style={[styles.threadRow, active && { backgroundColor: c.panel }]}
                     >
@@ -265,6 +271,19 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           placeholderTextColor={c.muted}
           style={[
             styles.input,
+            { color: c.text, backgroundColor: c.input, borderColor: c.border },
+          ]}
+        />
+        <Text style={[styles.personaLabel, { color: c.muted }]}>{t("sidebar.systemPrompt")}</Text>
+        <TextInput
+          value={personaDraft}
+          onChangeText={setPersonaDraft}
+          multiline
+          placeholder={t("sidebar.personaPlaceholder")}
+          placeholderTextColor={c.muted}
+          style={[
+            styles.input,
+            styles.personaInput,
             { color: c.text, backgroundColor: c.input, borderColor: c.border },
           ]}
         />
@@ -398,6 +417,17 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     fontSize: 14,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  personaLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 12,
+    marginBottom: 6,
+    letterSpacing: 0.2,
+  },
+  personaInput: {
+    minHeight: 72,
+    textAlignVertical: "top",
   },
   sheetActions: { flexDirection: "row", gap: 8, marginTop: 12 },
   ghostBtn: {

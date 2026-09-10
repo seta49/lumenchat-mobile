@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatMessage } from "../components/ChatMessage";
 import { Composer } from "../components/Composer";
@@ -10,7 +10,6 @@ import { Sidebar } from "../components/Sidebar";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
-import type { ChatMessage as ChatMessageType } from "../types/chat";
 
 function EmptyState() {
   const { c } = useTheme();
@@ -65,12 +64,14 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
-  const listRef = useRef<FlatList<ChatMessageType>>(null);
 
   const messages = activeThread?.messages ?? [];
+  // inverted FlatList: data harus newest-first biar chat terlihat normal
+  const reversed = useMemo(() => [...messages].reverse(), [messages]);
   const provider = settings.providers.find((p) => p.id === settings.activeProviderId)
     ?? settings.providers[0];
   const modelLabel = provider?.model ?? "";
+  const empty = messages.length === 0;
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
@@ -107,29 +108,29 @@ export function ChatScreen() {
         </Pressable>
       </View>
 
-      <KeyboardAwareScrollView
-        bottomOffset={8}
-        style={styles.root}
-        contentContainerStyle={{ flexGrow: 1 }}
-      >
-      <FlatList
-        ref={listRef}
-        data={messages}
-        keyExtractor={(m) => m.id}
-        renderItem={({ item }) => (
-          <ChatMessage message={item} streaming={streamingId === item.id} />
+      {/* Composer di LUAR scroll — biar nempel di bawah, gak ikut ke-scroll. */}
+      <KeyboardAvoidingView style={styles.root} behavior="padding">
+        {empty ? (
+          <View style={styles.emptyWrap}>
+            <EmptyState />
+          </View>
+        ) : (
+          <FlatList
+            inverted
+            data={reversed}
+            keyExtractor={(m) => m.id}
+            renderItem={({ item }) => (
+              <ChatMessage message={item} streaming={streamingId === item.id} />
+            )}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+          />
         )}
-        contentContainerStyle={styles.listContent}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-        ListEmptyComponent={<EmptyState />}
-        keyboardShouldPersistTaps="handled"
-        scrollEnabled={false}
-      />
+        <Composer />
+      </KeyboardAvoidingView>
 
-      <Composer />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <ModelSheet visible={modelOpen} onClose={() => setModelOpen(false)} />
-      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -157,7 +158,10 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 12,
     paddingVertical: 10,
-    flexGrow: 1,
+  },
+  emptyWrap: {
+    flex: 1,
+    backgroundColor: "transparent",
   },
   empty: {
     flex: 1,

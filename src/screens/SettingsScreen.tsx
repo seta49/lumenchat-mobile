@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProviderDialog, ProviderModelSheet } from "../components/ProviderDialog";
 import { getActiveProvider } from "../services/providers";
@@ -9,7 +10,8 @@ import { Sheet } from "../components/Sheet";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
-import type { ProviderConfig, ThemeMode } from "../types/chat";
+import { exportChatsJson, parseImportedChats, readTextFile } from "../utils/export";
+import type { ProviderConfig } from "../types/chat";
 
 function SectionHeader({ icon, label, sub }: { icon: string; label: string; sub?: string }) {
   const { c } = useTheme();
@@ -26,49 +28,35 @@ function Divider() {
   return <View style={[styles.divider, { backgroundColor: c.border }]} />;
 }
 
-function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
+function DataActionRow({
+  icon,
+  label,
+  onPress,
+  danger,
 }: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
 }) {
   const { c } = useTheme();
   return (
-    <View style={[styles.segment, { backgroundColor: c.panel, borderColor: c.border }]}>
-      {options.map((opt) => (
-        <Pressable
-          key={opt.value}
-          onPress={() => onChange(opt.value)}
-          style={[
-            styles.segmentBtn,
-            { backgroundColor: value === opt.value ? c.accent : "transparent" },
-          ]}
-        >
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "600",
-              color: value === opt.value ? c.onAccent : c.muted,
-            }}
-          >
-            {opt.label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
+    <Pressable onPress={onPress} style={styles.row}>
+      <Ionicons name={icon} size={18} color={danger ? c.danger : c.text} />
+      <Text style={{ color: danger ? c.danger : c.text, fontSize: 14, fontWeight: "600", flex: 1 }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 export function SettingsScreen() {
   const {
     settings,
-    updateSettings,
     removeProvider,
     setActiveProvider,
-    updateProvider,
+    threads,
+    importThreads,
   } = useStore();
   const { t } = useI18n();
   const { c } = useTheme();
@@ -196,41 +184,58 @@ export function SettingsScreen() {
           </Pressable>
         </View>
 
-        <SectionHeader icon="color-palette" label={t("settings.appearance")} sub={t("settings.appearanceSub")} />
+        <SectionHeader
+          icon="color-palette"
+          label={t("profile.appearance")}
+          sub={t("settings.appearanceSub")}
+        />
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <View style={styles.row}>
+          <Pressable onPress={() => router.push("/profile")} style={styles.row}>
+            <Ionicons name="color-palette-outline" size={18} color={c.text} />
             <View style={styles.rowBody}>
-              <Text style={[styles.rowTitle, { color: c.text }]}>{t("settings.theme")}</Text>
-              <Text style={[styles.rowSub, { color: c.muted }]}>{t("settings.themeHint")}</Text>
+              <Text style={[styles.rowTitle, { color: c.text }]}>{t("profile.appearance")}</Text>
+              <Text style={[styles.rowSub, { color: c.muted }]}>
+                {settings.theme === "dark" ? t("common.dark") : t("common.light")} ·{" "}
+                {settings.language === "en" ? t("common.english") : t("common.indonesian")}
+              </Text>
             </View>
-            <Segmented<ThemeMode>
-              options={[
-                { value: "dark", label: t("common.dark") },
-                { value: "light", label: t("common.light") },
-              ]}
-              value={settings.theme}
-              onChange={(theme) => updateSettings({ theme })}
-            />
-          </View>
-          <Divider />
-          <View style={styles.row}>
-            <View style={styles.rowBody}>
-              <Text style={[styles.rowTitle, { color: c.text }]}>{t("settings.language")}</Text>
-              <Text style={[styles.rowSub, { color: c.muted }]}>{t("settings.languageHint")}</Text>
-            </View>
-            <Segmented<"en" | "id">
-              options={[
-                { value: "en", label: t("common.english") },
-                { value: "id", label: t("common.indonesian") },
-              ]}
-              value={settings.language}
-              onChange={(language) => updateSettings({ language })}
-            />
-          </View>
+            <Ionicons name="chevron-forward" size={15} color={c.muted} />
+          </Pressable>
         </View>
 
-        <SectionHeader icon="server" label={t("settings.storage")} />
+        <SectionHeader icon="server" label={t("settings.data")} sub={t("settings.dataSub")} />
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <DataActionRow
+            icon="download-outline"
+            label={t("settings.exportAll")}
+            onPress={() => {
+              void exportChatsJson(threads).catch(() => {
+                Alert.alert(t("errors.requestFailed"));
+              });
+            }}
+          />
+          <Divider />
+          <DataActionRow
+            icon="cloud-upload-outline"
+            label={t("settings.importChats")}
+            onPress={() => {
+              void (async () => {
+                const res = await DocumentPicker.getDocumentAsync({
+                  type: "application/json",
+                  copyToCacheDirectory: true,
+                });
+                if (res.canceled || !res.assets?.length) return;
+                const raw = await readTextFile(res.assets[0].uri);
+                const imported = parseImportedChats(raw);
+                if (!imported) {
+                  Alert.alert(t("errors.importFailed"));
+                  return;
+                }
+                importThreads(imported);
+              })();
+            }}
+          />
+          <Divider />
           <View style={styles.row}>
             <View style={styles.rowBody}>
               <Text style={[styles.rowTitle, { color: c.text }]}>{t("settings.storage")}</Text>
@@ -239,7 +244,7 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={[styles.version, { color: c.muted }]}>Lumen mobile 0.1.0</Text>
+        <Text style={[styles.version, { color: c.muted }]}>Lumen mobile 0.2.0</Text>
       </ScrollView>
 
       <ProviderDialog visible={dialogOpen} editing={editing} onClose={() => setDialogOpen(false)} />
@@ -313,17 +318,6 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 11,
-  },
-  segment: {
-    flexDirection: "row",
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 2,
-  },
-  segmentBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 9,
   },
   version: { textAlign: "center", fontSize: 11, marginTop: 18 },
   sheetActions: { flexDirection: "row", gap: 8, marginTop: 12, justifyContent: "flex-end" },

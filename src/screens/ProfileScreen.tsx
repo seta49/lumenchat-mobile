@@ -63,7 +63,7 @@ function CardRow({
 }
 
 export function ProfileScreen() {
-  const { settings, updateSettings, threads, deleteThread } = useStore();
+  const { settings, updateSettings, threads, clearAllChats } = useStore();
   const { c } = useTheme();
   const { t } = useI18n();
   const router = useRouter();
@@ -186,9 +186,7 @@ export function ProfileScreen() {
           <Pressable
             onPress={() => {
               setConfirmClear(false);
-              for (const th of threads) {
-                deleteThread(th.id);
-              }
+              clearAllChats();
             }}
             style={[styles.primaryBtn, { backgroundColor: c.danger }]}
           >

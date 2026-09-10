@@ -72,12 +72,30 @@ export function ProviderDialog({
   const runTest = async () => {
     setTesting(true);
     setTestResult(null);
-    const res = await testProviderConnection(
-      { baseUrl: baseUrl.trim(), apiKey, model: "ping", apiFormat },
-      lang,
-    );
-    setTestResult(res.message);
-    setTesting(false);
+    try {
+      // Pakai model beneran — banyak provider (mis. Xiaomi MiMo) tolak model dummy "ping".
+      const def = PROVIDERS.find((p) => p.id === kind);
+      let testModel = editing?.model?.trim() || def?.defaultModel?.trim() || "";
+      if (!testModel) {
+        const list = await fetchProviderModels({
+          id: `test-${Date.now()}`,
+          kind,
+          name: "test",
+          baseUrl: baseUrl.trim(),
+          apiKey: apiKey.trim(),
+          model: "",
+          apiFormat,
+        });
+        testModel = list?.[0] ?? "";
+      }
+      const res = await testProviderConnection(
+        { baseUrl: baseUrl.trim(), apiKey, model: testModel, apiFormat },
+        lang,
+      );
+      setTestResult(res.message);
+    } finally {
+      setTesting(false);
+    }
   };
 
   const canSave = baseUrl.trim().length > 0;
@@ -86,13 +104,14 @@ export function ProviderDialog({
     if (!canSave) {
       return;
     }
+    const def = PROVIDERS.find((p) => p.id === kind);
     const payload: ProviderConfig = {
       id: editing?.id ?? newId(),
       kind,
       name: name.trim() || providerLabel(kind),
       baseUrl: baseUrl.trim(),
       apiKey: apiKey.trim(),
-      model: editing?.model ?? "",
+      model: editing?.model || def?.defaultModel || "",
       apiFormat,
       thinking: editing?.thinking,
     };

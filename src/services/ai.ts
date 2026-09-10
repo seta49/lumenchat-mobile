@@ -158,7 +158,21 @@ function splitSystem(messages: AIMessage[]): { system: string; messages: AIMessa
 }
 
 function toOpenAIMessages(messages: AIMessage[]): unknown[] {
-  return messages.map((message) => ({ role: message.role, content: message.content }));
+  return messages.map((message) => {
+    let content = message.content;
+    // OpenAI-compatible lebih stabil dengan string utk teks murni;
+    // array cuma dipakai kalau ada gambar.
+    if (Array.isArray(content)) {
+      const hasImage = content.some((p) => p.type === "image_url");
+      if (!hasImage) {
+        content = content
+          .map((p) => (p.type === "text" ? p.text ?? "" : ""))
+          .join("")
+          .trim();
+      }
+    }
+    return { role: message.role, content };
+  });
 }
 
 function toAnthropicContent(content: string | ContentPart[]): unknown[] {
@@ -206,6 +220,11 @@ function normalizeUsage(inputTokens: number, outputTokens: number): TokenUsage |
 async function streamOpenAI(params: StreamParams): Promise<StreamResult> {
   const { settings, lang, signal, callbacks } = params;
   const { system, messages } = splitSystem(params.messages);
+  // Jangan kirim system kosong — beberapa model jadi aneh / salah identitas.
+  const openaiMessages = [
+    ...(system ? [{ role: "system", content: system }] : []),
+    ...toOpenAIMessages(messages),
+  ];
 
   const response = await expoFetch(normalizeBaseUrl(settings.baseUrl) + "/chat/completions", {
     method: "POST",
@@ -216,7 +235,7 @@ async function streamOpenAI(params: StreamParams): Promise<StreamResult> {
     },
     body: JSON.stringify({
       model: settings.model,
-      messages: [{ role: "system", content: system }, ...toOpenAIMessages(messages)],
+      messages: openaiMessages,
       stream: true,
       ...(reasoningEffort(settings.thinking) ? { reasoning_effort: reasoningEffort(settings.thinking) } : {}),
     }),
@@ -295,6 +314,10 @@ async function streamOpenAI(params: StreamParams): Promise<StreamResult> {
 async function completeOpenAI(params: RequestParams): Promise<{ content: string; usage?: TokenUsage }> {
   const { settings, lang, signal } = params;
   const { system, messages } = splitSystem(params.messages);
+  const openaiMessages = [
+    ...(system ? [{ role: "system", content: system }] : []),
+    ...toOpenAIMessages(messages),
+  ];
 
   const response = await expoFetch(normalizeBaseUrl(settings.baseUrl) + "/chat/completions", {
     method: "POST",
@@ -305,7 +328,7 @@ async function completeOpenAI(params: RequestParams): Promise<{ content: string;
     },
     body: JSON.stringify({
       model: settings.model,
-      messages: [{ role: "system", content: system }, ...toOpenAIMessages(messages)],
+      messages: openaiMessages,
       stream: false,
       ...(reasoningEffort(settings.thinking) ? { reasoning_effort: reasoningEffort(settings.thinking) } : {}),
     }),
@@ -507,28 +530,6 @@ export async function completeProviderMessage(
     return completeAnthropic(params);
   }
   return completeOpenAI(params);
-}
-
-/** Reachability probe (GET /models) used by connection status (cheap polling). */
-export async function probeProvider(
-  settings: Pick<ProviderConfig, "baseUrl" | "apiKey" | "apiFormat">,
-): Promise<boolean> {
-  const base = normalizeBaseUrl(settings.baseUrl);
-  if (!base) {
-    return false;
-  }
-  try {
-    const headers =
-      settings.apiFormat === "anthropic"
-        ? anthropicHeaders(settings.apiKey)
-        : settings.apiKey.trim()
-          ? { Authorization: "Bearer " + settings.apiKey.trim() }
-          : {};
-    const response = await expoFetch(base + "/models", { method: "GET", headers });
-    return response.ok;
-  } catch {
-    return false;
-  }
 }
 
 export interface ConnectionTestResult {
