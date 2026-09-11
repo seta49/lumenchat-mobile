@@ -1,6 +1,6 @@
 import Markdown from "react-native-markdown-display";
 import * as WebBrowser from "expo-web-browser";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
 import { MathView } from "./MathView";
 
@@ -175,57 +175,9 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     bullet_list_icon: { color: c.muted },
     ordered_list_icon: { color: c.muted },
     hr: { backgroundColor: c.border, height: StyleSheet.hairlineWidth },
-    // Tabel: border rapi, header panel, padding cell
-    table: {
-      borderColor: c.border,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderRadius: 8,
-      marginVertical: 8,
-      overflow: "hidden" as const,
-    },
-    thead: { backgroundColor: c.panel },
-    th: {
-      color: fg,
-      backgroundColor: c.panel,
-      fontWeight: "700" as const,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: c.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
-    },
-    td: {
-      color: fg,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: c.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
-    },
-    tr: { flexDirection: "row" as const },
-    _VIEW_SAFE_table: { width: "100%" },
-    _VIEW_SAFE_tr: { flexDirection: "row" as const },
-    _VIEW_SAFE_th: {
-      flex: 1,
-      backgroundColor: c.panel,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: c.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
-    },
-    _VIEW_SAFE_td: {
-      flex: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: c.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
-    },
+    table: { marginVertical: 8 },
+    th: { color: fg, fontWeight: "700" as const },
+    td: { color: fg },
   };
 
   const rules = {
@@ -233,6 +185,48 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
       const code = node?.content ?? "";
       return <HighlightedCode key={node?.key ?? "fence"} code={code} />;
     },
+    // Tabel full-width + scroll horizontal (cell minWidth, gak dipaksa flex:1)
+    table: (node: { key?: string }, children: unknown) => (
+      <ScrollView
+        key={node?.key ?? "table"}
+        horizontal
+        showsHorizontalScrollIndicator
+        style={[stylesTable.wrap, { borderColor: c.border }]}
+        contentContainerStyle={{ minWidth: "100%" }}
+      >
+        <View style={stylesTable.inner}>{children as React.ReactNode}</View>
+      </ScrollView>
+    ),
+    thead: (node: { key?: string }, children: unknown) => (
+      <View key={node?.key ?? "thead"} style={[stylesTable.row, { backgroundColor: c.panel }]}>
+        {children as React.ReactNode}
+      </View>
+    ),
+    tbody: (node: { key?: string }, children: unknown) => (
+      <View key={node?.key ?? "tbody"}>{children as React.ReactNode}</View>
+    ),
+    tr: (node: { key?: string }, children: unknown) => (
+      <View key={node?.key ?? "tr"} style={stylesTable.row}>
+        {children as React.ReactNode}
+      </View>
+    ),
+    th: (node: { key?: string }, children: unknown) => (
+      <View
+        key={node?.key ?? "th"}
+        style={[stylesTable.cell, stylesTable.th, { borderColor: c.border, backgroundColor: c.panel }]}
+      >
+        <Text style={[stylesTable.thText, { color: fg }]} numberOfLines={3}>
+          {flattenText(children)}
+        </Text>
+      </View>
+    ),
+    td: (node: { key?: string }, children: unknown) => (
+      <View key={node?.key ?? "td"} style={[stylesTable.cell, { borderColor: c.border }]}>
+        <Text style={[stylesTable.tdText, { color: fg }]} numberOfLines={4}>
+          {flattenText(children)}
+        </Text>
+      </View>
+    ),
   };
 
   return (
@@ -275,3 +269,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
+
+const stylesTable = StyleSheet.create({
+  wrap: {
+    marginVertical: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+  },
+  inner: {
+    minWidth: "100%",
+  },
+  row: {
+    flexDirection: "row",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  cell: {
+    minWidth: 96,
+    maxWidth: 180,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRightWidth: StyleSheet.hairlineWidth,
+  },
+  th: {},
+  thText: {
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  tdText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+});
+
+/** Ambil teks polos dari children markdown (Text nodes / nested). */
+function flattenText(children: unknown): string {
+  if (children == null) return "";
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  if (Array.isArray(children)) return children.map(flattenText).join("");
+  if (typeof children === "object" && "props" in (children as object)) {
+    const props = (children as { props?: { children?: unknown } }).props;
+    return flattenText(props?.children);
+  }
+  return "";
+}
