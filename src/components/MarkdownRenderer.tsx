@@ -1,7 +1,8 @@
 import Markdown from "react-native-markdown-display";
 import * as WebBrowser from "expo-web-browser";
-import { useMemo, useRef } from "react";
-import { PanResponder, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 import { useTheme } from "../theme";
 import { MathView } from "./MathView";
 
@@ -284,56 +285,7 @@ function pushInlineMath(text: string, out: Seg[]) {
 
 // ---------------------------------------------------------------------------
 
-/** Scroller tabel: claim gesture horizontal lebih agresif dari list vertikal. */
-function TableScroller({ children }: { children: React.ReactNode }) {
-  const scrollRef = useRef<ScrollView>(null);
-  const lastX = useRef(0);
-  const scrollX = useRef(0);
-
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
-      onPanResponderGrant: () => {
-        lastX.current = 0;
-      },
-      onPanResponderMove: (_, g) => {
-        const dx = g.dx - lastX.current;
-        lastX.current = g.dx;
-        const next = Math.max(0, scrollX.current - dx);
-        scrollX.current = next;
-        scrollRef.current?.scrollTo({ x: next, animated: false });
-      },
-      onPanResponderRelease: () => {
-        lastX.current = 0;
-      },
-      onPanResponderTerminate: () => {
-        lastX.current = 0;
-      },
-    }),
-  ).current;
-
-  return (
-    <View {...pan.panHandlers} style={stylesTable.scrollHit}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        nestedScrollEnabled
-        showsHorizontalScrollIndicator
-        keyboardShouldPersistTaps="handled"
-        onScroll={(e) => {
-          scrollX.current = e.nativeEvent.contentOffset.x;
-        }}
-        scrollEventThrottle={16}
-        contentContainerStyle={stylesTable.scrollContent}
-      >
-        {children}
-      </ScrollView>
-    </View>
-  );
-}
-
+/** Tabel full-width + scroll horizontal (gesture-handler ScrollView). */
 function NativeTable({ header, rows }: { header: string[]; rows: string[][] }) {
   const { c } = useTheme();
   const cols = header.length;
@@ -355,7 +307,13 @@ function NativeTable({ header, rows }: { header: string[]; rows: string[][] }) {
 
   return (
     <View style={[stylesTable.wrap, { borderColor: c.border }]}>
-      <TableScroller>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={stylesTable.scrollContent}
+      >
         <View>
           {/* Header */}
           <View style={[stylesTable.row, { backgroundColor: c.panel }]}>
@@ -389,7 +347,7 @@ function NativeTable({ header, rows }: { header: string[]; rows: string[][] }) {
             </View>
           ))}
         </View>
-      </TableScroller>
+      </ScrollView>
       <View style={[stylesTable.hintBar, { borderTopColor: c.border }]}>
         <Text style={[stylesTable.hint, { color: c.muted }]}>← geser tabel →</Text>
       </View>
@@ -537,11 +495,8 @@ const stylesTable = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
     overflow: "hidden",
-  },
-  scrollHit: {
-    // area sentuh lebih tinggi biar gesture horizontal gampang ke-capture
-    minHeight: 56,
-    justifyContent: "center",
+    // full-width chat bubble
+    width: "100%",
   },
   scrollContent: {
     minWidth: "100%",
