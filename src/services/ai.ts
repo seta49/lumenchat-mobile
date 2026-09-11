@@ -226,6 +226,23 @@ async function streamOpenAI(params: StreamParams): Promise<StreamResult> {
     ...toOpenAIMessages(messages),
   ];
 
+  // DEBUG sementara — hapus setelah ketemu masalah bus/blind spot
+  if (__DEV__) {
+    console.log(
+      "[Lumen API]",
+      settings.model,
+      JSON.stringify(
+        openaiMessages.map((m) => ({
+          role: (m as { role: string }).role,
+          content:
+            typeof (m as { content: unknown }).content === "string"
+              ? String((m as { content: string }).content).slice(0, 80)
+              : "[parts]",
+        })),
+      ),
+    );
+  }
+
   const response = await expoFetch(normalizeBaseUrl(settings.baseUrl) + "/chat/completions", {
     method: "POST",
     signal,
