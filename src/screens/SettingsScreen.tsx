@@ -348,7 +348,7 @@ export function SettingsScreen() {
           </Pressable>
         </View>
 
-        <Text style={[styles.version, { color: c.muted }]}>Lumen mobile 0.2.0</Text>
+        <Text style={[styles.version, { color: c.muted }]}>Lumen mobile 0.3.0</Text>
       </ScrollView>
 
       <ProviderDialog visible={dialogOpen} editing={editing} onClose={() => setDialogOpen(false)} />
