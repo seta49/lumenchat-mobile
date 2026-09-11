@@ -127,6 +127,15 @@ function fenceInfo(node: {
 
 const LATEX_LANGS = new Set(["latex", "tex", "math", "katex", "stex"]);
 
+/** KaTeX cuma bisa math — tabular / document / package gak didukung. */
+function isKaTeXMath(code: string): boolean {
+  if (/\\(begin\{(?:tabular|tabularx|longtable|landscape|document|figure|table)\}|usepackage|documentclass|setlength|renewcommand|toprule|midrule|bottomrule|hline)/.test(code)) {
+    return false;
+  }
+  // Harus ada ciri math
+  return /\\(frac|sqrt|sum|prod|int|alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|omega|cdot|times|leq|geq|neq|infty|left|right|hat|bar|vec|partial|nabla|begin\{(?:equation|align|matrix|bmatrix|pmatrix|cases)\}|\\[|\\(|\^|_)/.test(code);
+}
+
 /** Pecah body: $$display$$ dan $inline$ → MathView, sisanya teks biasa. */
 function splitMath(body: string): Array<{ type: "text" | "math"; value: string; display?: boolean }> {
   const out: Array<{ type: "text" | "math"; value: string; display?: boolean }> = [];
@@ -221,14 +230,15 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     }) => {
       const { lang, code } = fenceInfo(node);
       const key = node?.key ?? "fence";
-      if (LATEX_LANGS.has(lang)) {
-        // KaTeX sering butuh display math
+      if (LATEX_LANGS.has(lang) || /\\(frac|sqrt|sum|alpha|beta|cdot|times|begin\{equation)/.test(code)) {
         const tex = code.trim();
-        return <MathView key={key} tex={tex} display />;
-      }
-      // Deteksi isi yang isinya mostly math (mis. \begin{...} / \frac)
-      if (!lang && /\\(begin|frac|sqrt|sum|alpha|beta|times|cdot)/.test(code)) {
-        return <MathView key={key} tex={code.trim()} display />;
+        // tabular / document LaTeX → code block (KaTeX gak support)
+        if (LATEX_LANGS.has(lang) && !isKaTeXMath(tex)) {
+          return <HighlightedCode key={key} code={tex} />;
+        }
+        if (isKaTeXMath(tex)) {
+          return <MathView key={key} tex={tex} display />;
+        }
       }
       return <HighlightedCode key={key} code={code} />;
     },
