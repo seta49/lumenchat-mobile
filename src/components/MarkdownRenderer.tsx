@@ -521,13 +521,4 @@ const stylesTable = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  hintBar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 5,
-    alignItems: "center",
-  },
-  hint: {
-    fontSize: 11,
-    letterSpacing: 0.3,
-  },
 });
