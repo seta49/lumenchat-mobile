@@ -126,14 +126,20 @@ export function ChatMessage({
           parts.map((part, i) =>
             part.type === "image_url" ? (
               <ImagePart key={i} part={part} />
+            ) : isUser ? (
+              <Text key={i} style={[styles.userText, { color: c.text }]}>
+                {part.text ?? ""}
+              </Text>
             ) : (
-              <MarkdownRenderer key={i} body={part.text ?? ""} tint={isUser ? c.text : undefined} />
+              <MarkdownRenderer key={i} body={part.text ?? ""} />
             ),
           )
         ) : streamingEmpty ? (
           <TypingDots />
+        ) : isUser ? (
+          <Text style={[styles.userText, { color: c.text }]}>{rawText}</Text>
         ) : (
-          <MarkdownRenderer body={rawText} tint={isUser ? c.text : undefined} />
+          <MarkdownRenderer body={rawText} />
         )}
         {!streaming && message.usage && !isUser ? (
           <View style={styles.usageRow}>
@@ -231,8 +237,12 @@ const styles = StyleSheet.create({
   bubble: {
     maxWidth: "84%",
     borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  userText: {
+    fontSize: 15,
+    lineHeight: 21,
   },
   // Balasan AI: full-width tanpa bubble — ala ChatGPT
   aiBlock: {

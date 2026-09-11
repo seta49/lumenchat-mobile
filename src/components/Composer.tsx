@@ -2,18 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import { File } from "expo-file-system";
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from "expo-speech-recognition";
 import { useEffect, useState } from "react";
-import { Alert, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "../i18n";
 import { getActiveProvider } from "../services/providers";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
 import { pickAndCompressImage } from "../utils/image";
+import { useOptionalVoice } from "../utils/voice";
 import type { ContentPart } from "../types/chat";
 import { Sheet } from "./Sheet";
 import { ThinkingSheet } from "./ThinkingSheet";
@@ -36,7 +33,6 @@ export function Composer() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(false);
-  const [listening, setListening] = useState(false);
 
   // Share intent (SEND text/plain) → isi composer sekali.
   useEffect(() => {
@@ -46,40 +42,12 @@ export function Composer() {
     }
   }, [settings.pendingShare, updateSettings]);
 
-  useSpeechRecognitionEvent("result", (event) => {
-    const transcript = event.results?.[0]?.transcript ?? "";
-    if (transcript) {
+  const { listening, toggle: toggleVoice } = useOptionalVoice(
+    (transcript) => {
       setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-    }
-    setListening(false);
-  });
-  useSpeechRecognitionEvent("error", () => {
-    setListening(false);
-  });
-
-  const toggleVoice = async () => {
-    if (listening) {
-      ExpoSpeechRecognitionModule.stop();
-      setListening(false);
-      return;
-    }
-    try {
-      const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert(t("chat.voiceUnavailable"));
-        return;
-      }
-      setListening(true);
-      ExpoSpeechRecognitionModule.start({
-        lang: "id-ID",
-        interimResults: false,
-        maxAlternatives: 1,
-      });
-    } catch {
-      setListening(false);
-      Alert.alert(t("chat.voiceUnavailable"));
-    }
-  };
+    },
+    t("chat.voiceUnavailable"),
+  );
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () => setKbOpen(true));
@@ -93,16 +61,7 @@ export function Composer() {
   const provider = getActiveProvider(settings);
   const thinking = provider?.thinking ?? "off";
   const thinkingOn = thinking !== "off";
-  const thinkingLabel =
-    thinking === "off"
-      ? t("chat.thinkingOff")
-      : thinking === "low"
-        ? t("chat.thinkingLow")
-        : thinking === "medium"
-          ? t("chat.thinkingMedium")
-          : thinking === "high"
-            ? t("chat.thinkingHigh")
-            : t("chat.thinkingMax");
+  const thinkingLabel = thinkingOn ? t("chat.thinkingOn") : t("chat.thinkingOff");
 
   const streaming = streamingId !== null;
   const canSend = text.trim().length > 0 || images.length > 0 || files.length > 0;

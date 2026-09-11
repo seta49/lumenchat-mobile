@@ -96,6 +96,9 @@ const en = {
   "model.reasoning": "Reasoning",
   "model.listOffline": "Could not load the model list — showing saved defaults.",
   "model.refresh": "Refresh list",
+  "chat.thinkingOn": "On",
+  "chat.thinkingOffHint": "Normal answers, faster",
+  "chat.thinkingOnHint": "Highest reasoning (max)",
 
   // Home / composer (v2)
   "chat.greeting": "Hey {name}, what's on your mind?",
@@ -290,6 +293,9 @@ const id: Record<TranslationKey, string> = {
   "model.reasoning": "Penalaran",
   "model.listOffline": "Gagal memuat daftar model — menampilkan daftar tersimpan.",
   "model.refresh": "Muat ulang",
+  "chat.thinkingOn": "Nyala",
+  "chat.thinkingOffHint": "Jawaban normal, lebih cepat",
+  "chat.thinkingOnHint": "Penalaran tertinggi (max)",
 
   // Home / composer (v2)
   "chat.greeting": "Halo {name}, apa yang kamu pikirkan?",
