@@ -187,15 +187,17 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     },
     // Tabel full-width + scroll horizontal (cell minWidth, gak dipaksa flex:1)
     table: (node: { key?: string }, children: unknown) => (
-      <ScrollView
-        key={node?.key ?? "table"}
-        horizontal
-        showsHorizontalScrollIndicator
-        style={[stylesTable.wrap, { borderColor: c.border }]}
-        contentContainerStyle={{ minWidth: "100%" }}
-      >
-        <View style={stylesTable.inner}>{children as React.ReactNode}</View>
-      </ScrollView>
+      <View key={node?.key ?? "table"} style={[stylesTable.wrap, { borderColor: c.border }]}>
+        <ScrollView
+          horizontal
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={stylesTable.inner}
+        >
+          {children as React.ReactNode}
+        </ScrollView>
+      </View>
     ),
     thead: (node: { key?: string }, children: unknown) => (
       <View key={node?.key ?? "thead"} style={[stylesTable.row, { backgroundColor: c.panel }]}>
@@ -275,20 +277,26 @@ const stylesTable = StyleSheet.create({
     marginVertical: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
+    overflow: "hidden",
+    // biar gesture horizontal lebih mudah menang vs list vertikal
+    minHeight: 44,
   },
   inner: {
+    flexDirection: "column",
+    alignItems: "stretch",
     minWidth: "100%",
   },
   row: {
     flexDirection: "row",
     borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: "stretch",
   },
   cell: {
-    minWidth: 96,
-    maxWidth: 180,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    minWidth: 120,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRightWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
   },
   th: {},
   thText: {
