@@ -94,10 +94,42 @@ function HighlightedCode({ code }: { code: string }) {
   );
 }
 
+/** Ambil teks polos dari children markdown (Text nodes / nested). */
+function flattenText(children: unknown): string {
+  if (children == null) return "";
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  if (Array.isArray(children)) return children.map(flattenText).join("");
+  if (typeof children === "object" && "props" in (children as object)) {
+    const props = (children as { props?: { children?: unknown } }).props;
+    return flattenText(props?.children);
+  }
+  return "";
+}
+
+/** Fence node → language + isi. */
+function fenceInfo(node: {
+  content?: string;
+  info?: string;
+  attributes?: Record<string, unknown>;
+}): { lang: string; code: string } {
+  const raw = node?.content ?? "";
+  const code = raw.endsWith("\n") ? raw.slice(0, -1) : raw;
+  const info =
+    (typeof node?.info === "string" && node.info) ||
+    (typeof node?.attributes?.class === "string"
+      ? String(node.attributes.class)
+      : "") ||
+    "";
+  const lang = info.replace(/^language-?/i, "").trim().toLowerCase();
+  return { lang, code };
+}
+
+const LATEX_LANGS = new Set(["latex", "tex", "math", "katex", "stex"]);
+
 /** Pecah body: $$display$$ dan $inline$ → MathView, sisanya teks biasa. */
 function splitMath(body: string): Array<{ type: "text" | "math"; value: string; display?: boolean }> {
   const out: Array<{ type: "text" | "math"; value: string; display?: boolean }> = [];
-  // $$ ... $$ dulu (multiline), baru $ ... $ (inline, tanpa $ ganda)
   const re = /\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g;
   let last = 0;
   let m: RegExpExecArray | null;
@@ -181,24 +213,45 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
   };
 
   const rules = {
-    fence: (node: { content?: string; key?: string }) => {
-      const code = node?.content ?? "";
-      return <HighlightedCode key={node?.key ?? "fence"} code={code} />;
+    fence: (node: {
+      content?: string;
+      info?: string;
+      attributes?: Record<string, unknown>;
+      key?: string;
+    }) => {
+      const { lang, code } = fenceInfo(node);
+      const key = node?.key ?? "fence";
+      if (LATEX_LANGS.has(lang)) {
+        // KaTeX sering butuh display math
+        const tex = code.trim();
+        return <MathView key={key} tex={tex} display />;
+      }
+      // Deteksi isi yang isinya mostly math (mis. \begin{...} / \frac)
+      if (!lang && /\\(begin|frac|sqrt|sum|alpha|beta|times|cdot)/.test(code)) {
+        return <MathView key={key} tex={code.trim()} display />;
+      }
+      return <HighlightedCode key={key} code={code} />;
     },
-    // Tabel full-width + scroll horizontal (cell minWidth, gak dipaksa flex:1)
-    table: (node: { key?: string }, children: unknown) => (
-      <View key={node?.key ?? "table"} style={[stylesTable.wrap, { borderColor: c.border }]}>
-        <ScrollView
-          horizontal
-          nestedScrollEnabled
-          showsHorizontalScrollIndicator
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={stylesTable.inner}
-        >
-          {children as React.ReactNode}
-        </ScrollView>
-      </View>
-    ),
+    // Tabel full-width + scroll horizontal dengan indikator jelas
+    table: (node: { key?: string }, children: unknown) => {
+      const key = node?.key ?? "table";
+      return (
+        <View key={key} style={[stylesTable.wrap, { borderColor: c.border }]}>
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={stylesTable.inner}
+          >
+            {children as React.ReactNode}
+          </ScrollView>
+          <View style={[stylesTable.hintBar, { borderTopColor: c.border }]}>
+            <Text style={[stylesTable.hint, { color: c.muted }]}>← geser tabel →</Text>
+          </View>
+        </View>
+      );
+    },
     thead: (node: { key?: string }, children: unknown) => (
       <View key={node?.key ?? "thead"} style={[stylesTable.row, { backgroundColor: c.panel }]}>
         {children as React.ReactNode}
@@ -215,16 +268,16 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     th: (node: { key?: string }, children: unknown) => (
       <View
         key={node?.key ?? "th"}
-        style={[stylesTable.cell, stylesTable.th, { borderColor: c.border, backgroundColor: c.panel }]}
+        style={[stylesTable.cell, { borderColor: c.border, backgroundColor: c.panel }]}
       >
-        <Text style={[stylesTable.thText, { color: fg }]} numberOfLines={3}>
+        <Text style={[stylesTable.thText, { color: fg }]} numberOfLines={4}>
           {flattenText(children)}
         </Text>
       </View>
     ),
     td: (node: { key?: string }, children: unknown) => (
       <View key={node?.key ?? "td"} style={[stylesTable.cell, { borderColor: c.border }]}>
-        <Text style={[stylesTable.tdText, { color: fg }]} numberOfLines={4}>
+        <Text style={[stylesTable.tdText, { color: fg }]} numberOfLines={5}>
           {flattenText(children)}
         </Text>
       </View>
@@ -278,7 +331,6 @@ const stylesTable = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
     overflow: "hidden",
-    // biar gesture horizontal lebih mudah menang vs list vertikal
     minHeight: 44,
   },
   inner: {
@@ -292,13 +344,12 @@ const stylesTable = StyleSheet.create({
     alignItems: "stretch",
   },
   cell: {
-    minWidth: 120,
+    minWidth: 132,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRightWidth: StyleSheet.hairlineWidth,
     justifyContent: "center",
   },
-  th: {},
   thText: {
     fontSize: 13,
     fontWeight: "700",
@@ -308,17 +359,13 @@ const stylesTable = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  hintBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 5,
+    alignItems: "center",
+  },
+  hint: {
+    fontSize: 11,
+    letterSpacing: 0.3,
+  },
 });
-
-/** Ambil teks polos dari children markdown (Text nodes / nested). */
-function flattenText(children: unknown): string {
-  if (children == null) return "";
-  if (typeof children === "string") return children;
-  if (typeof children === "number") return String(children);
-  if (Array.isArray(children)) return children.map(flattenText).join("");
-  if (typeof children === "object" && "props" in (children as object)) {
-    const props = (children as { props?: { children?: unknown } }).props;
-    return flattenText(props?.children);
-  }
-  return "";
-}
