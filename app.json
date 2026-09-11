@@ -18,7 +18,7 @@
     "androidNavigationBar": {
       "backgroundColor": "#000000",
       "barStyle": "light-content",
-      "visible": "immersive"
+      "visible": "visible"
     },
     "android": {
       "package": "com.setab49.lumen",

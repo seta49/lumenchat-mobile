@@ -99,7 +99,6 @@ export function ChatScreen() {
   ).current;
 
   const messages = activeThread?.messages ?? [];
-  const reversed = useMemo(() => [...messages].reverse(), [messages]);
   const provider =
     settings.providers.find((p) => p.id === settings.activeProviderId) ?? settings.providers[0];
   const modelLabel = provider?.model ?? "";
@@ -221,8 +220,7 @@ export function ChatScreen() {
         ) : (
           <FlatList
             ref={listRef}
-            inverted
-            data={reversed}
+            data={messages}
             keyExtractor={(m) => m.id}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
@@ -233,6 +231,9 @@ export function ChatScreen() {
             windowSize={11}
             removeClippedSubviews
             updateCellsBatchingPeriod={50}
+            onContentSizeChange={() => {
+              listRef.current?.scrollToEnd({ animated: false });
+            }}
           />
         )}
         <Composer />
