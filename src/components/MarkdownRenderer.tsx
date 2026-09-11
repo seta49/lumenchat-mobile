@@ -99,18 +99,26 @@ function fenceInfo(node: {
 
 const LATEX_LANGS = new Set(["latex", "tex", "math", "katex", "stex"]);
 
+/** Tabular/dokumen LaTeX → BUKAN math KaTeX. Cek \begin dan \\begin. */
+function isDocumentLatex(code: string): boolean {
+  const s = code.replace(/\\\\/g, "\\");
+  return /\\(?:begin\{(?:tabular|tabularx|longtable|landscape|document|figure|table|itemize|enumerate)\}|usepackage|documentclass|setlength|renewcommand|toprule|midrule|bottomrule|hline|textbf|multicolumn|rowcolor|cline)/.test(
+    s,
+  );
+}
+
 function isKaTeXMath(code: string): boolean {
-  // Tabular / dokumen / package → BUKAN math
-  if (/\\(?:begin\{(?:tabular|tabularx|longtable|landscape|document|figure|table|itemize)\}|usepackage|documentclass|setlength|renewcommand|toprule|midrule|bottomrule|hline|textbf|multicolumn|rowcolor)/.test(code)) {
+  if (isDocumentLatex(code)) {
     return false;
   }
-  // Terlalu panjang / banyak baris → kemungkinan bukan rumus
   if (code.length > 400 || code.split("\n").length > 12) {
     return false;
   }
-  // Harus ada ciri math yang KaTeX kenal
-  return /\\(?:frac|sqrt|sum|prod|int|alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|omega|cdot|times|leq|geq|neq|infty|partial|nabla|hat|bar|vec|lim|log|sin|cos|tan)/.test(code) ||
-    /\\begin\{(?:equation|align|gather|matrix|bmatrix|pmatrix|vmatrix|cases)\}/.test(code);
+  const s = code.replace(/\\\\/g, "\\");
+  return (
+    /\\(?:frac|sqrt|sum|prod|int|alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|omega|cdot|times|leq|geq|neq|infty|partial|nabla|hat|bar|vec|lim|log|sin|cos|tan)/.test(s) ||
+    /\\begin\{(?:equation|align|gather|matrix|bmatrix|pmatrix|vmatrix|cases)\}/.test(s)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -132,12 +140,17 @@ function splitPipeRow(line: string): string[] {
 
 function isTableSeparator(line: string): boolean {
   const s = line.trim();
-  return /^\|?[\s:|-]+\|?$/.test(s) && s.includes("-") && /^[\s|:-]+$/.test(s);
+  if (!s.includes("-")) return false;
+  return /^[\s|:-]+$/.test(s) && /\|/.test(s);
 }
 
 function isTableRow(line: string): boolean {
   const s = line.trim();
-  return s.includes("|") && s.length > 1 && !isTableSeparator(s) && !s.startsWith("```");
+  if (s.startsWith("```")) return false;
+  if (!s.includes("|")) return false;
+  // minimal 2 pipe (| a | b |) biar gak kena teks biasa yang ada |
+  const pipes = (s.match(/\|/g) || []).length;
+  return pipes >= 2;
 }
 
 /** Pecah body jadi segmen: math, code fence, tabel markdown, teks biasa. */
@@ -230,9 +243,9 @@ function parseSegments(body: string): Seg[] {
 }
 
 function pushInlineMath(text: string, out: Seg[]) {
-  // $$ display math
-  const reDisplay = /\$\$([\s\S]+?)\$\$\$/g;
-  // Inline math: $...$ tanpa newline, minimal 1 char, bukan $$
+  // $$ ... $$ display (non-greedy, bisa multiline)
+  const reDisplay = /\$\$([\s\S]+?)\$\$/g;
+  // Inline $...$ tanpa newline, bukan $$
   const reInline = /(?<!\$)\$([^$\n]+?)\$(?!\$)/g;
 
   let last = 0;
@@ -242,15 +255,19 @@ function pushInlineMath(text: string, out: Seg[]) {
     if (m.index > last) {
       out.push({ type: "text", value: text.slice(last, m.index) });
     }
-    out.push({ type: "math", value: m[1].trim(), display: true });
+    const body = m[1].trim();
+    if (body && !isDocumentLatex(body) && body.length <= 400) {
+      out.push({ type: "math", value: body, display: true });
+    } else {
+      out.push({ type: "text", value: m[0] });
+    }
     last = m.index + m[0].length;
   }
   const rest = text.slice(last);
   last = 0;
   while ((m = reInline.exec(rest))) {
     const body = m[1].trim();
-    // Skip "math" yang kepanjangan / mirip kode
-    if (!body || body.length > 200 || /\\(?:begin|usepackage|hline|textbf)/.test(body)) {
+    if (!body || body.length > 200 || isDocumentLatex(body) || /\s{2,}/.test(body)) {
       continue;
     }
     if (m.index > last) {
@@ -387,7 +404,10 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     <View>
       {segments.map((seg, i) => {
         if (seg.type === "math") {
-          return <MathView key={`m${i}`} tex={seg.value} display={seg.display} />;
+          if (isKaTeXMath(seg.value) || !isDocumentLatex(seg.value)) {
+            return <MathView key={`m${i}`} tex={seg.value} display={seg.display} />;
+          }
+          return <HighlightedCode key={`m${i}`} code={seg.value} />;
         }
         if (seg.type === "code") {
           if (LATEX_LANGS.has(seg.lang) && isKaTeXMath(seg.value)) {
