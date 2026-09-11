@@ -1,6 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import * as Linking from "expo-linking";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PanResponder } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type ListRenderItemInfo,
+} from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatMessage } from "../components/ChatMessage";
@@ -10,6 +20,8 @@ import { Sidebar } from "../components/Sidebar";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
+import type { ChatMessage as ChatMessageType } from "../types/chat";
+import { contentToText } from "../services/ai";
 
 function EmptyState() {
   const { c } = useTheme();
@@ -58,20 +70,79 @@ function SparkleMark() {
 }
 
 export function ChatScreen() {
-  const { activeThread, streamingId, settings, createThread } = useStore();
+  const {
+    activeThread,
+    streamingId,
+    settings,
+    createThread,
+    updateSettings,
+  } = useStore();
   const { c } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const listRef = useRef<FlatList<ChatMessageType>>(null);
+
+  // Edge swipe dari kiri → buka sidebar (hanya saat drag, gak block tap)
+  const edgePan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, g) =>
+        evt.nativeEvent.pageX < 28 && g.dx > 12 && Math.abs(g.dy) < 30,
+      onPanResponderRelease: (_evt, g) => {
+        if (g.dx > 48) setSidebarOpen(true);
+      },
+    }),
+  ).current;
 
   const messages = activeThread?.messages ?? [];
-  // inverted FlatList: data harus newest-first biar chat terlihat normal
   const reversed = useMemo(() => [...messages].reverse(), [messages]);
-  const provider = settings.providers.find((p) => p.id === settings.activeProviderId)
-    ?? settings.providers[0];
+  const provider =
+    settings.providers.find((p) => p.id === settings.activeProviderId) ?? settings.providers[0];
   const modelLabel = provider?.model ?? "";
   const empty = messages.length === 0;
+
+  const searchHits = useMemo(() => {
+    if (!searchQ.trim()) return [];
+    const q = searchQ.toLowerCase();
+    return messages
+      .filter((m) => contentToText(m.content).toLowerCase().includes(q))
+      .map((m) => m.id);
+  }, [messages, searchQ]);
+
+  // Share intent Android (SEND text/plain) → isi composer via settings.pendingShare
+  useEffect(() => {
+    const handleShare = (url: string) => {
+      try {
+        const parsed = new URL(url.replace("lumenchat://", "https://"));
+        const shared = parsed.searchParams.get("text") ?? "";
+        if (shared) {
+          updateSettings({ pendingShare: shared });
+        }
+      } catch {
+        // ignore
+      }
+    };
+    const sub = Linking.addEventListener("url", ({ url }) => handleShare(url));
+    void Linking.getInitialURL().then((u) => {
+      if (u) handleShare(u);
+    });
+    return () => sub.remove();
+  }, [updateSettings]);
+
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<ChatMessageType>) => (
+      <ChatMessage
+        message={item}
+        streaming={streamingId === item.id}
+        highlight={searchQ.trim() ? searchQ : undefined}
+      />
+    ),
+    [streamingId, searchQ],
+  );
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
@@ -99,6 +170,21 @@ export function ChatScreen() {
         <View style={{ flex: 1 }} />
 
         <Pressable
+          onPress={() => {
+            setSearchOpen((v) => !v);
+            if (searchOpen) setSearchQ("");
+          }}
+          hitSlop={8}
+          style={styles.headerBtn}
+        >
+          <Ionicons
+            name={searchOpen ? "close" : "search"}
+            size={20}
+            color={searchOpen ? c.accent : c.text}
+          />
+        </Pressable>
+
+        <Pressable
           onPress={() => createThread()}
           hitSlop={8}
           style={styles.headerBtn}
@@ -108,7 +194,25 @@ export function ChatScreen() {
         </Pressable>
       </View>
 
-      {/* Composer di LUAR scroll — biar nempel di bawah, gak ikut ke-scroll. */}
+      {searchOpen ? (
+        <View style={[styles.searchBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
+          <Ionicons name="search" size={15} color={c.muted} />
+          <TextInput
+            value={searchQ}
+            onChangeText={setSearchQ}
+            placeholder={t("chat.search")}
+            placeholderTextColor={c.muted}
+            autoFocus
+            style={[styles.searchInput, { color: c.text }]}
+          />
+          {searchQ ? (
+            <Text style={{ color: c.muted, fontSize: 12 }}>
+              {t("chat.searchHits", { n: searchHits.length })}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       <KeyboardAvoidingView style={styles.root} behavior="padding">
         {empty ? (
           <View style={styles.emptyWrap}>
@@ -116,17 +220,27 @@ export function ChatScreen() {
           </View>
         ) : (
           <FlatList
+            ref={listRef}
             inverted
             data={reversed}
             keyExtractor={(m) => m.id}
-            renderItem={({ item }) => (
-              <ChatMessage message={item} streaming={streamingId === item.id} />
-            )}
+            renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
+            // Optimasi chat panjang
+            initialNumToRender={12}
+            maxToRenderPerBatch={10}
+            windowSize={11}
+            removeClippedSubviews
+            updateCellsBatchingPeriod={50}
           />
         )}
         <Composer />
+        {/* Overlay tipis di tepi kiri untuk detect edge swipe */}
+        <View
+          style={styles.edgeHit}
+          {...edgePan.panHandlers}
+        />
       </KeyboardAvoidingView>
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -150,11 +264,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    maxWidth: "55%",
+    maxWidth: "45%",
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   modelChipText: { fontSize: 15, fontWeight: "700" },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  searchInput: { flex: 1, fontSize: 14, padding: 0 },
   listContent: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -163,6 +286,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "transparent",
   },
+  edgeHit: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 24,
+  },
   empty: {
     flex: 1,
     alignItems: "center",
@@ -170,7 +300,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingBottom: 60,
   },
-  sparkleWrap: { width: 60, height: 60, alignItems: "center", justifyContent: "center", marginBottom: 18 },
+  sparkleWrap: {
+    width: 60,
+    height: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
   sparkleDot: { position: "absolute", width: 12, height: 12, borderRadius: 3 },
   greeting: { fontSize: 24, fontWeight: "500", textAlign: "center", lineHeight: 32 },
 });

@@ -294,9 +294,11 @@ export async function loadSettings(): Promise<AppSettings> {
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
   const providers = await stripAndStoreKeys(settings.providers);
+  // pendingShare hanya ephemeral (share intent) — jangan persist
+  const { pendingShare: _share, ...rest } = settings;
   await AsyncStorage.setItem(
     SETTINGS_KEY,
-    JSON.stringify({ ...settings, providers }),
+    JSON.stringify({ ...rest, providers }),
   );
 }
 

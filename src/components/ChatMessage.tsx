@@ -56,9 +56,11 @@ function plainText(content: string | ContentPart[]): string {
 export function ChatMessage({
   message,
   streaming,
+  highlight,
 }: {
   message: ChatMessageType;
   streaming: boolean;
+  highlight?: string;
 }) {
   const { c } = useTheme();
   const { t } = useI18n();
@@ -69,16 +71,19 @@ export function ChatMessage({
 
   const isUser = message.role === "user";
   const parts = typeof message.content === "string" ? null : message.content;
-  const text = typeof message.content === "string" ? message.content : "";
-  const streamingEmpty = streaming && !text.trim() && !parts;
+  const rawText = typeof message.content === "string" ? message.content : "";
+  const streamingEmpty = streaming && !rawText.trim() && !parts;
+  const matched =
+    highlight &&
+    rawText.toLowerCase().includes(highlight.toLowerCase());
 
   const copy = async () => {
     await Clipboard.setStringAsync(plainText(message.content));
     setActionsOpen(false);
   };
-  const doRegenerate = () => {
+  const doRegenerate = (nuance?: "default" | "shorter" | "longer" | "casual") => {
     setActionsOpen(false);
-    void regenerate(message.id);
+    void regenerate(message.id, nuance ?? "default");
   };
   const startEdit = () => {
     setActionsOpen(false);
@@ -100,7 +105,7 @@ export function ChatMessage({
           {
             backgroundColor: isUser ? c.bubbleUser : c.panel,
             borderWidth: isUser ? 0 : StyleSheet.hairlineWidth,
-            borderColor: c.border,
+            borderColor: matched ? c.accent : c.border,
           },
         ]}
       >
@@ -115,7 +120,7 @@ export function ChatMessage({
         ) : streamingEmpty ? (
           <TypingDots />
         ) : (
-          <MarkdownRenderer body={text} tint={isUser ? c.text : undefined} />
+          <MarkdownRenderer body={rawText} tint={isUser ? c.text : undefined} />
         )}
         {!streaming && message.usage && !isUser ? (
           <View style={styles.usageRow}>
@@ -139,10 +144,24 @@ export function ChatMessage({
             <Text style={{ color: c.text, fontSize: 14 }}>{t("message.editResend")}</Text>
           </Pressable>
         ) : (
-          <Pressable onPress={doRegenerate} style={styles.actionRow}>
-            <Ionicons name="refresh-outline" size={18} color={c.text} />
-            <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerate")}</Text>
-          </Pressable>
+          <>
+            <Pressable onPress={() => doRegenerate("default")} style={styles.actionRow}>
+              <Ionicons name="refresh-outline" size={18} color={c.text} />
+              <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerate")}</Text>
+            </Pressable>
+            <Pressable onPress={() => doRegenerate("shorter")} style={styles.actionRow}>
+              <Ionicons name="contract-outline" size={18} color={c.text} />
+              <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerateShorter")}</Text>
+            </Pressable>
+            <Pressable onPress={() => doRegenerate("longer")} style={styles.actionRow}>
+              <Ionicons name="expand-outline" size={18} color={c.text} />
+              <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerateLonger")}</Text>
+            </Pressable>
+            <Pressable onPress={() => doRegenerate("casual")} style={styles.actionRow}>
+              <Ionicons name="happy-outline" size={18} color={c.text} />
+              <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerateCasual")}</Text>
+            </Pressable>
+          </>
         )}
         <Pressable
           onPress={() => {

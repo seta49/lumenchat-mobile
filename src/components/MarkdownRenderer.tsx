@@ -1,4 +1,5 @@
 import Markdown from "react-native-markdown-display";
+import * as WebBrowser from "expo-web-browser";
 import { StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
 
@@ -161,7 +162,14 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
   };
 
   return (
-    <Markdown style={styles as never} rules={rules as never}>
+    <Markdown
+      style={styles as never}
+      rules={rules as never}
+      onLinkPress={(url: string) => {
+        void WebBrowser.openBrowserAsync(url);
+        return false;
+      }}
+    >
       {body}
     </Markdown>
   );

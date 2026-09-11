@@ -60,6 +60,9 @@ const en = {
 
   // Message actions
   "message.regenerate": "Regenerate",
+  "message.regenerateShorter": "Regenerate shorter",
+  "message.regenerateLonger": "Regenerate longer",
+  "message.regenerateCasual": "Regenerate casual",
   "message.fork": "Fork conversation",
   "message.copy": "Copy",
   "message.readAloud": "Read aloud",
@@ -67,6 +70,15 @@ const en = {
   "message.delete": "Delete message",
   "message.saveResend": "Save & resend",
   "message.imageFailed": "Image failed to load (file too large). Resend the image.",
+
+  // Chat search
+  "chat.search": "Search this chat",
+  "chat.searchHits": "{n} found",
+  "chat.searchPrev": "Prev",
+  "chat.searchNext": "Next",
+  "chat.voiceStart": "Hold to speak",
+  "chat.voiceStop": "Listening…",
+  "chat.voiceUnavailable": "Voice input is not available on this device.",
 
   // Typing indicator
   "typing.thinking": "Lumen is thinking…",
@@ -236,6 +248,9 @@ const id: Record<TranslationKey, string> = {
 
   // Message actions
   "message.regenerate": "Buat ulang",
+  "message.regenerateShorter": "Buat ulang singkat",
+  "message.regenerateLonger": "Buat ulang panjang",
+  "message.regenerateCasual": "Buat ulang santai",
   "message.fork": "Fork percakapan",
   "message.copy": "Salin",
   "message.readAloud": "Bacakan",
@@ -243,6 +258,15 @@ const id: Record<TranslationKey, string> = {
   "message.delete": "Hapus pesan",
   "message.saveResend": "Simpan & kirim ulang",
   "message.imageFailed": "Gambar gagal dimuat (file terlalu besar). Kirim ulang gambarnya.",
+
+  // Chat search
+  "chat.search": "Cari di chat ini",
+  "chat.searchHits": "{n} ditemukan",
+  "chat.searchPrev": "Sebelumnya",
+  "chat.searchNext": "Berikutnya",
+  "chat.voiceStart": "Tahan untuk bicara",
+  "chat.voiceStop": "Mendengarkan…",
+  "chat.voiceUnavailable": "Voice input tidak tersedia di perangkat ini.",
 
   // Typing indicator
   "typing.thinking": "Lumen sedang berpikir…",

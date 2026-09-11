@@ -76,6 +76,8 @@ export interface AppSettings {
   accent?: string;
   /** Nama panggilan di greeting layar home. */
   profileName?: string;
+  /** Teks dari share intent Android (SEND) — dikonsumsi Composer sekali. */
+  pendingShare?: string;
 }
 
 export interface AIMessage {

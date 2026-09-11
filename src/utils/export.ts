@@ -84,3 +84,43 @@ export async function readTextFile(uri: string): Promise<string> {
   const file = new File(uri);
   return file.text();
 }
+
+/** Convert satu thread jadi Markdown readable. */
+export function threadToMarkdown(thread: ChatThread): string {
+  const lines: string[] = [`# ${thread.title}`, ""];
+  if (thread.systemPrompt?.trim()) {
+    lines.push(`> System: ${thread.systemPrompt.trim()}`, "");
+  }
+  for (const m of thread.messages) {
+    const role = m.role === "user" ? "You" : m.role === "assistant" ? "Lumen" : "System";
+    lines.push(`## ${role}`);
+    lines.push("");
+    if (typeof m.content === "string") {
+      lines.push(m.content);
+    } else {
+      for (const p of m.content) {
+        if (p.type === "text" && p.text) lines.push(p.text);
+        if (p.type === "image_url") lines.push("*(image attached)*");
+      }
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+/** Export satu chat ke file .md di cache, lalu share sheet. */
+export async function exportThreadMarkdown(thread: ChatThread): Promise<void> {
+  const md = threadToMarkdown(thread);
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  const safe = thread.title.replace(/[^\w\s-]/g, "").slice(0, 32) || "chat";
+  const file = new File(Paths.cache, `${safe}-${stamp}.md`);
+  file.create({ overwrite: true });
+  file.write(md);
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(file.uri, {
+      mimeType: "text/markdown",
+      dialogTitle: "Export Lumen chat",
+      UTI: "net.daringfireball.markdown",
+    });
+  }
+}

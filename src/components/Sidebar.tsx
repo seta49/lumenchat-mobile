@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
 import { useTheme } from "../theme";
+import { exportThreadMarkdown } from "../utils/export";
 import { Sheet } from "./Sheet";
 
 function messageText(msg: { content: unknown }): string {
@@ -113,6 +114,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       deleteThread(deleteId);
     }
     setDeleteId(null);
+  };
+  const exportMd = (id: string) => {
+    const thread = threads.find((th) => th.id === id);
+    if (thread) void exportThreadMarkdown(thread);
   };
 
   const initials = ((settings.profileName?.trim() || "Lumen")
@@ -288,6 +293,17 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           ]}
         />
         <View style={styles.sheetActions}>
+          <Pressable
+            onPress={() => {
+              if (renameId) {
+                exportMd(renameId);
+              }
+              setRenameId(null);
+            }}
+            style={[styles.ghostBtn, { borderColor: c.border }]}
+          >
+            <Text style={{ color: c.accent, fontSize: 13 }}>{t("settings.exportMd")}</Text>
+          </Pressable>
           <Pressable
             onPress={() => {
               if (renameId) setDeleteId(renameId);

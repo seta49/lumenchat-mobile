@@ -28,6 +28,19 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "intentFilters": [
+        {
+          "action": "SEND",
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
+        }
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -45,7 +58,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,

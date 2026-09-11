@@ -22,6 +22,21 @@ import { streamProviderMessage } from "./services/ai";
 import { loadChats, loadSettings, saveChats, saveSettings } from "./services/storage";
 import { newId } from "./utils/id";
 
+export type RegenerateNuance = "default" | "shorter" | "longer" | "casual";
+
+const NUANCE_INSTRUCTIONS: Record<RegenerateNuance, string | null> = {
+  default: null,
+  shorter: "Tulis ulang jawaban terakhir LEBIH SINGKAT dan padat.",
+  longer: "Tulis ulang jawaban terakhir LEBIH PANJANG dan detail.",
+  casual: "Tulis ulang jawaban terakhir dengan gaya santai dan kasual.",
+};
+
+function titleFromText(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return "Chat";
+  return clean.length > 48 ? `${clean.slice(0, 48)}…` : clean;
+}
+
 interface StoreValue {
   ready: boolean;
   settings: AppSettings;
@@ -36,7 +51,7 @@ interface StoreValue {
   setActiveThread: (id: string) => void;
   send: (text: string, images: ContentPart[]) => Promise<void>;
   /** Generate ulang jawaban assistant (hapus pesan itu, kirim ulang konteks s/d sebelumnya). */
-  regenerate: (assistantMessageId: string) => Promise<void>;
+  regenerate: (assistantMessageId: string, nuance?: RegenerateNuance) => Promise<void>;
   /** Ganti isi pesan user & hapus semua pesan setelahnya, lalu stream jawaban baru. */
   editAndResend: (userMessageId: string, text: string) => Promise<void>;
   deleteMessage: (messageId: string) => void;
@@ -167,7 +182,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       abortRef.current = controller;
       setStreamingId(assistantMsg.id);
 
-      const appendDelta = (delta: string) => {
+      // Throttle flush delta tiap ~50ms — biar FlatList gak re-render tiap token.
+      let pending = "";
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+      const flush = () => {
+        if (!pending) return;
+        const chunk = pending;
+        pending = "";
         setThreads((ts) =>
           ts.map((t) =>
             t.id === threadId
@@ -175,13 +196,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   ...t,
                   messages: t.messages.map((m) =>
                     m.id === assistantMsg.id
-                      ? { ...m, content: (typeof m.content === "string" ? m.content : "") + delta }
+                      ? { ...m, content: (typeof m.content === "string" ? m.content : "") + chunk }
                       : m,
                   ),
                 }
               : t,
           ),
         );
+      };
+      const appendDelta = (delta: string) => {
+        pending += delta;
+        if (flushTimer == null) {
+          flushTimer = setTimeout(() => {
+            flushTimer = null;
+            flush();
+          }, 50);
+        }
       };
       const setUsage = (usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }) => {
         setThreads((ts) =>
@@ -229,6 +259,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         }
       } finally {
+        if (flushTimer != null) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        flush();
         abortRef.current = null;
         setStreamingId(null);
       }
@@ -267,7 +302,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!existing) {
       const fresh: ChatThread = {
         id: newId(),
-        title: `Chat ${currentThreads.length + 1}`,
+        title: titleFromText(typeof content === "string" ? content : ""),
         messages: [userMsg, assistantMsg],
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -277,10 +312,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setThreads((ts) => [fresh, ...ts]);
       setActiveThreadId(fresh.id);
     } else {
+      // Auto-rename judul default "Chat N" pakai pesan user pertama.
       setThreads((ts) =>
         ts.map((t) =>
           t.id === threadId
-            ? { ...t, updatedAt: Date.now(), messages: [...t.messages, userMsg, assistantMsg] }
+            ? {
+                ...t,
+                updatedAt: Date.now(),
+                messages: [...t.messages, userMsg, assistantMsg],
+                ...(t.title.startsWith("Chat ") && t.messages.length === 0
+                  ? { title: titleFromText(typeof content === "string" ? content : "") }
+                  : {}),
+              }
             : t,
         ),
       );
@@ -300,15 +343,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   /** Regenerate: buang jawaban assistant tsb, stream ulang dari konteks sebelumnya. */
   const regenerate = useCallback(
-    async (assistantMessageId: string) => {
+    async (assistantMessageId: string, nuance: RegenerateNuance = "default") => {
       if (streamingIdRef.current) return;
       const { settings: currentSettings, threads: currentThreads } = stateRef.current;
       const thread = currentThreads.find((t) => t.messages.some((m) => m.id === assistantMessageId));
       if (!thread) return;
       const idx = thread.messages.findIndex((m) => m.id === assistantMessageId);
-      const historyMessages: AIMessage[] = thread.messages
+      let historyMessages: AIMessage[] = thread.messages
         .slice(0, idx)
         .map((m) => ({ role: m.role, content: m.content }));
+      const instruction = NUANCE_INSTRUCTIONS[nuance];
+      if (instruction) {
+        historyMessages = [...historyMessages, { role: "user", content: instruction }];
+      }
       if (!historyMessages.length) return;
 
       const fresh: ChatMessage = {

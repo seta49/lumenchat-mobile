@@ -2,8 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import { File } from "expo-file-system";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 import { useEffect, useState } from "react";
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "../i18n";
 import { getActiveProvider } from "../services/providers";
@@ -22,7 +26,7 @@ interface FileAttachment {
 /** Composer: pill [+][input][reasoning][send], keyboard-aware native,
  * attach gambar + dokumen (txt/md/json/csv/kode). */
 export function Composer() {
-  const { settings, streamingId, send, stop } = useStore();
+  const { settings, streamingId, send, stop, updateSettings } = useStore();
   const { t } = useI18n();
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -32,6 +36,50 @@ export function Composer() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(false);
+  const [listening, setListening] = useState(false);
+
+  // Share intent (SEND text/plain) → isi composer sekali.
+  useEffect(() => {
+    if (settings.pendingShare) {
+      setText((prev) => (prev ? `${prev}\n${settings.pendingShare}` : settings.pendingShare ?? ""));
+      updateSettings({ pendingShare: undefined });
+    }
+  }, [settings.pendingShare, updateSettings]);
+
+  useSpeechRecognitionEvent("result", (event) => {
+    const transcript = event.results?.[0]?.transcript ?? "";
+    if (transcript) {
+      setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    }
+    setListening(false);
+  });
+  useSpeechRecognitionEvent("error", () => {
+    setListening(false);
+  });
+
+  const toggleVoice = async () => {
+    if (listening) {
+      ExpoSpeechRecognitionModule.stop();
+      setListening(false);
+      return;
+    }
+    try {
+      const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(t("chat.voiceUnavailable"));
+        return;
+      }
+      setListening(true);
+      ExpoSpeechRecognitionModule.start({
+        lang: "id-ID",
+        interimResults: false,
+        maxAlternatives: 1,
+      });
+    } catch {
+      setListening(false);
+      Alert.alert(t("chat.voiceUnavailable"));
+    }
+  };
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () => setKbOpen(true));
@@ -206,6 +254,19 @@ export function Composer() {
           >
             {thinkingLabel}
           </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => void toggleVoice()}
+          hitSlop={6}
+          style={[styles.iconBtn, listening && { backgroundColor: c.danger + "33" }]}
+          accessibilityLabel={listening ? t("chat.voiceStop") : t("chat.voiceStart")}
+        >
+          <Ionicons
+            name={listening ? "mic" : "mic-outline"}
+            size={20}
+            color={listening ? c.danger : c.muted}
+          />
         </Pressable>
 
         {streaming ? (
