@@ -129,11 +129,15 @@ const LATEX_LANGS = new Set(["latex", "tex", "math", "katex", "stex"]);
 
 /** KaTeX cuma bisa math — tabular / document / package gak didukung. */
 function isKaTeXMath(code: string): boolean {
-  if (/\\(begin\{(?:tabular|tabularx|longtable|landscape|document|figure|table)\}|usepackage|documentclass|setlength|renewcommand|toprule|midrule|bottomrule|hline)/.test(code)) {
+  if (/\\begin\{(?:tabular|tabularx|longtable|landscape|document|figure|table)\}/.test(code)) {
     return false;
   }
-  // Harus ada ciri math
-  return /\\(frac|sqrt|sum|prod|int|alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|omega|cdot|times|leq|geq|neq|infty|left|right|hat|bar|vec|partial|nabla|begin\{(?:equation|align|matrix|bmatrix|pmatrix|cases)\}|\\[|\\(|\^|_)/.test(code);
+  if (/\\(?:usepackage|documentclass|setlength|renewcommand)/.test(code)) {
+    return false;
+  }
+  // Ciri math yang KaTeX kenal
+  return /\\(?:frac|sqrt|sum|prod|int|alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|omega|cdot|times|leq|geq|neq|infty|partial|nabla)/.test(code) ||
+    /\\begin\{(?:equation|align|matrix|bmatrix|pmatrix|cases)\}/.test(code);
 }
 
 /** Pecah body: $$display$$ dan $inline$ → MathView, sisanya teks biasa. */
