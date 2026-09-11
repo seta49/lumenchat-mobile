@@ -100,16 +100,17 @@ function fenceInfo(node: {
 const LATEX_LANGS = new Set(["latex", "tex", "math", "katex", "stex"]);
 
 function isKaTeXMath(code: string): boolean {
-  if (/\\begin\{(?:tabular|tabularx|longtable|landscape|document|figure|table)\}/.test(code)) {
+  // Tabular / dokumen / package → BUKAN math
+  if (/\\(?:begin\{(?:tabular|tabularx|longtable|landscape|document|figure|table|itemize)\}|usepackage|documentclass|setlength|renewcommand|toprule|midrule|bottomrule|hline|textbf|multicolumn|rowcolor)/.test(code)) {
     return false;
   }
-  if (/\\(?:usepackage|documentclass|setlength|renewcommand)/.test(code)) {
+  // Terlalu panjang / banyak baris → kemungkinan bukan rumus
+  if (code.length > 400 || code.split("\n").length > 12) {
     return false;
   }
-  return (
-    /\\(?:frac|sqrt|sum|prod|int|alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|omega|cdot|times|leq|geq|neq|infty|partial|nabla)/.test(code) ||
-    /\\begin\{(?:equation|align|matrix|bmatrix|pmatrix|cases)\}/.test(code)
-  );
+  // Harus ada ciri math yang KaTeX kenal
+  return /\\(?:frac|sqrt|sum|prod|int|alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|omega|cdot|times|leq|geq|neq|infty|partial|nabla|hat|bar|vec|lim|log|sin|cos|tan)/.test(code) ||
+    /\\begin\{(?:equation|align|gather|matrix|bmatrix|pmatrix|vmatrix|cases)\}/.test(code);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,27 +230,37 @@ function parseSegments(body: string): Seg[] {
 }
 
 function pushInlineMath(text: string, out: Seg[]) {
-  const re = /\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g;
+  // $$ display math
+  const reDisplay = /\$\$([\s\S]+?)\$\$\$/g;
+  // Inline math: $...$ tanpa newline, minimal 1 char, bukan $$
+  const reInline = /(?<!\$)\$([^$\n]+?)\$(?!\$)/g;
+
   let last = 0;
   let m: RegExpExecArray | null;
-  let pushed = false;
-  while ((m = re.exec(text))) {
+
+  while ((m = reDisplay.exec(text))) {
     if (m.index > last) {
       out.push({ type: "text", value: text.slice(last, m.index) });
-      pushed = true;
     }
-    if (m[1] != null) {
-      out.push({ type: "math", value: m[1].trim(), display: true });
-    } else {
-      out.push({ type: "math", value: (m[2] ?? "").trim(), display: false });
-    }
+    out.push({ type: "math", value: m[1].trim(), display: true });
     last = m.index + m[0].length;
-    pushed = true;
   }
-  if (last < text.length) {
-    out.push({ type: "text", value: text.slice(last) });
-  } else if (!pushed && text.length) {
-    out.push({ type: "text", value: text });
+  const rest = text.slice(last);
+  last = 0;
+  while ((m = reInline.exec(rest))) {
+    const body = m[1].trim();
+    // Skip "math" yang kepanjangan / mirip kode
+    if (!body || body.length > 200 || /\\(?:begin|usepackage|hline|textbf)/.test(body)) {
+      continue;
+    }
+    if (m.index > last) {
+      out.push({ type: "text", value: rest.slice(last, m.index) });
+    }
+    out.push({ type: "math", value: body, display: false });
+    last = m.index + m[0].length;
+  }
+  if (last < rest.length) {
+    out.push({ type: "text", value: rest.slice(last) });
   }
 }
 
