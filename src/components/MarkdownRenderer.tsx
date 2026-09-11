@@ -1,5 +1,6 @@
 import Markdown from "react-native-markdown-display";
 import * as WebBrowser from "expo-web-browser";
+import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
 import { MathView } from "./MathView";
@@ -285,6 +286,24 @@ function pushInlineMath(text: string, out: Seg[]) {
 
 function NativeTable({ header, rows }: { header: string[]; rows: string[][] }) {
   const { c } = useTheme();
+  const cols = header.length;
+
+  // Lebar kolom: berdasarkan konten terpanjang, di-clamp biar rapi
+  const colWidths = useMemo(() => {
+    const widths: number[] = [];
+    for (let i = 0; i < cols; i++) {
+      let maxLen = (header[i] ?? "").length;
+      for (const row of rows) {
+        maxLen = Math.max(maxLen, (row[i] ?? "").length);
+      }
+      // 8px per char + padding 24, clamp 110–200
+      widths.push(Math.min(Math.max(maxLen * 7.5 + 28, 110), 200));
+    }
+    return widths;
+  }, [header, rows, cols]);
+
+  const strip = (s: string) => s.replace(/\*\*|__/g, "").trim();
+
   return (
     <View style={[stylesTable.wrap, { borderColor: c.border }]}>
       <ScrollView
@@ -294,21 +313,32 @@ function NativeTable({ header, rows }: { header: string[]; rows: string[][] }) {
         keyboardShouldPersistTaps="handled"
       >
         <View>
+          {/* Header */}
           <View style={[stylesTable.row, { backgroundColor: c.panel }]}>
             {header.map((h, i) => (
-              <View key={i} style={[stylesTable.cell, { borderColor: c.border, backgroundColor: c.panel }]}>
-                <Text style={[stylesTable.thText, { color: c.text }]} numberOfLines={4}>
-                  {h.replace(/\*\*|__/g, "")}
+              <View
+                key={i}
+                style={[
+                  stylesTable.cell,
+                  { width: colWidths[i], borderColor: c.border, backgroundColor: c.panel },
+                ]}
+              >
+                <Text style={[stylesTable.thText, { color: c.text }]} numberOfLines={3}>
+                  {strip(h)}
                 </Text>
               </View>
             ))}
           </View>
+          {/* Body */}
           {rows.map((row, ri) => (
             <View key={ri} style={[stylesTable.row, { borderBottomColor: c.border }]}>
-              {row.map((cell, ci) => (
-                <View key={ci} style={[stylesTable.cell, { borderColor: c.border }]}>
-                  <Text style={[stylesTable.tdText, { color: c.text }]} numberOfLines={6}>
-                    {cell.replace(/\*\*|__/g, "")}
+              {header.map((_, ci) => (
+                <View
+                  key={ci}
+                  style={[stylesTable.cell, { width: colWidths[ci], borderColor: c.border }]}
+                >
+                  <Text style={[stylesTable.tdText, { color: c.text }]} numberOfLines={5}>
+                    {strip(row[ci] ?? "")}
                   </Text>
                 </View>
               ))}
@@ -469,10 +499,9 @@ const stylesTable = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   cell: {
-    minWidth: 140,
-    maxWidth: 220,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    minWidth: 110,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     borderRightWidth: StyleSheet.hairlineWidth,
     justifyContent: "center",
   },
