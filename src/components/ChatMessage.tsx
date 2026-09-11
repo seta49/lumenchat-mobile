@@ -96,18 +96,31 @@ export function ChatMessage({
   };
 
   return (
-    <View style={[styles.row, { justifyContent: isUser ? "flex-end" : "flex-start" }]}>
+    <View style={[styles.row, isUser && styles.rowUser]}>
       <Pressable
         onLongPress={() => !streaming && setActionsOpen(true)}
         delayLongPress={300}
-        style={[
-          styles.bubble,
-          {
-            backgroundColor: isUser ? c.bubbleUser : c.panel,
-            borderWidth: isUser ? 0 : StyleSheet.hairlineWidth,
-            borderColor: matched ? c.accent : c.border,
-          },
-        ]}
+        style={
+          isUser
+            ? [
+                styles.bubble,
+                {
+                  backgroundColor: c.bubbleUser,
+                  borderColor: matched ? c.accent : c.border,
+                  borderWidth: matched ? 1 : 0,
+                },
+              ]
+            : [
+                styles.aiBlock,
+                matched
+                  ? {
+                      borderLeftWidth: 2,
+                      borderLeftColor: c.accent,
+                      paddingLeft: 10,
+                    }
+                  : null,
+              ]
+        }
       >
         {parts ? (
           parts.map((part, i) =>
@@ -210,14 +223,22 @@ export function ChatMessage({
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: "row",
-    marginVertical: 4,
+    marginVertical: 6,
+  },
+  rowUser: {
+    alignItems: "flex-end",
   },
   bubble: {
     maxWidth: "84%",
     borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  // Balasan AI: full-width tanpa bubble — ala ChatGPT
+  aiBlock: {
+    width: "100%",
+    paddingHorizontal: 2,
+    paddingVertical: 2,
   },
   image: {
     borderRadius: 12,
