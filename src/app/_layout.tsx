@@ -1,25 +1,48 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import * as SystemUI from "expo-system-ui";
+import { useFonts } from "expo-font";
+import {
+  Sora_400Regular,
+  Sora_500Medium,
+  Sora_600SemiBold,
+  Sora_700Bold,
+  Sora_800ExtraBold,
+} from "@expo-google-fonts/sora";
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_700Bold,
+} from "@expo-google-fonts/jetbrains-mono";
 import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { I18nProvider } from "../i18n";
 import { StoreProvider, useStore } from "../store";
 import { ThemeProvider, useTheme } from "../theme";
+import { applyLumenFonts } from "../fonts";
 
 function ThemedRoot() {
   const { c } = useTheme();
   const { ready, settings } = useStore();
+  const [fontsLoaded, fontError] = useFonts({
+    Sora_400Regular,
+    Sora_500Medium,
+    Sora_600SemiBold,
+    Sora_700Bold,
+    Sora_800ExtraBold,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_700Bold,
+  });
 
-  // Warna window background = warna tema (hilangkan gap putih status/nav bar)
   useEffect(() => {
-    void SystemUI.setBackgroundColorAsync(c.bg);
-  }, [c.bg]);
+    if (fontsLoaded || fontError) {
+      applyLumenFonts();
+    }
+  }, [fontsLoaded, fontError]);
 
-  if (!ready) {
+  if (!ready || (!fontsLoaded && !fontError)) {
     return <View style={{ flex: 1, backgroundColor: c.bg }} />;
   }
   return (
@@ -49,18 +72,12 @@ function Root() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={styles.flex}>
-      <SafeAreaProvider>
-        <KeyboardProvider>
-          <StoreProvider>
-            <Root />
-          </StoreProvider>
-        </KeyboardProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <KeyboardProvider>
+        <StoreProvider>
+          <Root />
+        </StoreProvider>
+      </KeyboardProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-});

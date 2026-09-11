@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { useTheme } from "../theme";
+import { FONTS } from "../fonts";
 import { MathView } from "./MathView";
 
 /** Highlighter ringan tanpa lib eksternal. */
@@ -349,9 +350,6 @@ function NativeTable({ header, rows }: { header: string[]; rows: string[][] }) {
           ))}
         </View>
       </ScrollView>
-      <View style={[stylesTable.hintBar, { borderTopColor: c.border }]}>
-        <Text style={[stylesTable.hint, { color: c.muted }]}>← geser tabel →</Text>
-      </View>
     </View>
   );
 }
@@ -376,7 +374,7 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     code_inline: {
       backgroundColor: c.codeBg,
       color: c.accent,
-      fontFamily: "monospace",
+      fontFamily: FONTS.mono,
       fontSize: 13,
       paddingHorizontal: 4,
       borderRadius: 4,
@@ -384,7 +382,7 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     code_block: {
       backgroundColor: "transparent",
       color: fg,
-      fontFamily: "monospace",
+      fontFamily: FONTS.mono,
       fontSize: 13,
       padding: 0,
       marginTop: 10,
@@ -393,7 +391,7 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     fence: {
       backgroundColor: "transparent",
       color: fg,
-      fontFamily: "monospace",
+      fontFamily: FONTS.mono,
       fontSize: 13,
       padding: 0,
       marginTop: 10,
@@ -482,12 +480,12 @@ const styles = StyleSheet.create({
     marginVertical: 6,
   },
   codeLine: {
-    fontFamily: "monospace",
+    fontFamily: FONTS.mono,
     fontSize: 13,
     lineHeight: 18,
   },
   codeTok: {
-    fontFamily: "monospace",
+    fontFamily: FONTS.mono,
     fontSize: 13,
   },
 });
