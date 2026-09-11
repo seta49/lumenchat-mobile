@@ -365,7 +365,7 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
   const styles = {
     body: { color: fg, fontSize: 15, lineHeight: 21 },
     text: { color: fg },
-    paragraph: { marginTop: 0, marginBottom: 8, color: fg },
+    paragraph: { marginTop: 0, marginBottom: 10, color: fg },
     heading1: { color: fg, fontSize: 20, fontWeight: "700" as const, marginTop: 10, marginBottom: 6 },
     heading2: { color: fg, fontSize: 18, fontWeight: "700" as const, marginTop: 9, marginBottom: 5 },
     heading3: { color: fg, fontSize: 16, fontWeight: "700" as const, marginTop: 8, marginBottom: 4 },
@@ -387,7 +387,8 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
       fontFamily: "monospace",
       fontSize: 13,
       padding: 0,
-      marginVertical: 6,
+      marginTop: 10,
+      marginBottom: 12,
     },
     fence: {
       backgroundColor: "transparent",
@@ -395,7 +396,8 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
       fontFamily: "monospace",
       fontSize: 13,
       padding: 0,
-      marginVertical: 6,
+      marginTop: 10,
+      marginBottom: 12,
     },
     blockquote: {
       borderLeftWidth: 3,
@@ -492,11 +494,11 @@ const styles = StyleSheet.create({
 
 const stylesTable = StyleSheet.create({
   wrap: {
-    marginVertical: 8,
+    marginTop: 14,
+    marginBottom: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
     overflow: "hidden",
-    // full-width chat bubble
     width: "100%",
   },
   scrollContent: {

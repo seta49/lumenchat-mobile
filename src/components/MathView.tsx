@@ -92,7 +92,7 @@ try {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginVertical: 4 },
+  wrap: { marginTop: 10, marginBottom: 12 },
   loading: {
     position: "absolute",
     left: 0,
