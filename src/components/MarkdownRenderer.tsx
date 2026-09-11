@@ -2,6 +2,7 @@ import Markdown from "react-native-markdown-display";
 import * as WebBrowser from "expo-web-browser";
 import { StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
+import { MathView } from "./MathView";
 
 /** Highlighter ringan tanpa lib eksternal — cukup warna keyword/string/comment/number. */
 const KEYWORDS =
@@ -9,8 +10,10 @@ const KEYWORDS =
 
 type Piece = { text: string; color?: string };
 
-function tokenizeLine(line: string, c: { accent: string; success: string; danger: string; muted: string; text: string }): Piece[] {
-  // comment dulu (# atau //)
+function tokenizeLine(
+  line: string,
+  c: { accent: string; success: string; danger: string; muted: string; text: string },
+): Piece[] {
   const commentIdx = line.search(/(#|\/\/)/);
   let code = line;
   let comment = "";
@@ -20,7 +23,6 @@ function tokenizeLine(line: string, c: { accent: string; success: string; danger
   }
 
   const pieces: Piece[] = [];
-  // string "..." atau '...'
   const strRe = /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g;
   let last = 0;
   let m: RegExpExecArray | null;
@@ -92,10 +94,36 @@ function HighlightedCode({ code }: { code: string }) {
   );
 }
 
-/** Renderer markdown dengan code block highlight custom (tanpa prism/refractor). */
+/** Pecah body: $$display$$ dan $inline$ → MathView, sisanya teks biasa. */
+function splitMath(body: string): Array<{ type: "text" | "math"; value: string; display?: boolean }> {
+  const out: Array<{ type: "text" | "math"; value: string; display?: boolean }> = [];
+  // $$ ... $$ dulu (multiline), baru $ ... $ (inline, tanpa $ ganda)
+  const re = /\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body))) {
+    if (m.index > last) {
+      out.push({ type: "text", value: body.slice(last, m.index) });
+    }
+    if (m[1] != null) {
+      out.push({ type: "math", value: m[1].trim(), display: true });
+    } else {
+      out.push({ type: "math", value: (m[2] ?? "").trim(), display: false });
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < body.length) {
+    out.push({ type: "text", value: body.slice(last) });
+  }
+  return out;
+}
+
+/** Renderer markdown + code highlight + tabel rapi + LaTeX (KaTeX WebView). */
 export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }) {
   const { c } = useTheme();
   const fg = tint ?? c.text;
+
+  const segments = splitMath(body);
 
   const styles = {
     body: { color: fg, fontSize: 15, lineHeight: 21 },
@@ -116,7 +144,6 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
       paddingHorizontal: 4,
       borderRadius: 4,
     },
-    // fence/code_block pakai renderer custom di bawah (style tetap kosong-ish)
     code_block: {
       backgroundColor: "transparent",
       color: fg,
@@ -148,12 +175,59 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
     bullet_list_icon: { color: c.muted },
     ordered_list_icon: { color: c.muted },
     hr: { backgroundColor: c.border, height: StyleSheet.hairlineWidth },
-    table: { borderColor: c.border },
-    th: { color: fg, backgroundColor: c.panel, fontWeight: "700" as const },
-    td: { color: fg },
+    // Tabel: border rapi, header panel, padding cell
+    table: {
+      borderColor: c.border,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: 8,
+      marginVertical: 8,
+      overflow: "hidden" as const,
+    },
+    thead: { backgroundColor: c.panel },
+    th: {
+      color: fg,
+      backgroundColor: c.panel,
+      fontWeight: "700" as const,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderRightColor: c.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    td: {
+      color: fg,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderRightColor: c.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    tr: { flexDirection: "row" as const },
+    _VIEW_SAFE_table: { width: "100%" },
+    _VIEW_SAFE_tr: { flexDirection: "row" as const },
+    _VIEW_SAFE_th: {
+      flex: 1,
+      backgroundColor: c.panel,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderRightColor: c.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    _VIEW_SAFE_td: {
+      flex: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderRightColor: c.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
   };
 
-  // Override fence: render HighlightedCode (fungsi langsung, bukan { renderer })
   const rules = {
     fence: (node: { content?: string; key?: string }) => {
       const code = node?.content ?? "";
@@ -162,16 +236,25 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
   };
 
   return (
-    <Markdown
-      style={styles as never}
-      rules={rules as never}
-      onLinkPress={(url: string) => {
-        void WebBrowser.openBrowserAsync(url);
-        return false;
-      }}
-    >
-      {body}
-    </Markdown>
+    <View>
+      {segments.map((seg, i) =>
+        seg.type === "math" ? (
+          <MathView key={`m${i}`} tex={seg.value} display={seg.display} />
+        ) : (
+          <Markdown
+            key={`t${i}`}
+            style={styles as never}
+            rules={rules as never}
+            onLinkPress={(url: string) => {
+              void WebBrowser.openBrowserAsync(url);
+              return false;
+            }}
+          >
+            {seg.value}
+          </Markdown>
+        ),
+      )}
+    </View>
   );
 }
 
