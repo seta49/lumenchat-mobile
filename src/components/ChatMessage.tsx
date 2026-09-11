@@ -141,14 +141,6 @@ export function ChatMessage({
         ) : (
           <MarkdownRenderer body={rawText} />
         )}
-        {!streaming && message.usage && !isUser ? (
-          <View style={styles.usageRow}>
-            <Ionicons name="analytics-outline" size={11} color={c.muted} />
-            <Text style={[styles.usageText, { color: c.muted }]}>
-              {message.usage.total_tokens} tok
-            </Text>
-          </View>
-        ) : null}
       </Pressable>
 
       {/* Aksi pesan */}
@@ -253,15 +245,6 @@ const styles = StyleSheet.create({
   image: {
     borderRadius: 12,
     marginVertical: 4,
-  },
-  usageRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 6,
-  },
-  usageText: {
-    fontSize: 11,
   },
   actionRow: {
     flexDirection: "row",
