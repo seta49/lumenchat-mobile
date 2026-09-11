@@ -233,7 +233,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               <Pressable
                 onPress={() => {
                   onClose();
-                  router.push("/profile");
+                  router.push("/settings");
                 }}
                 style={styles.footerProfile}
               >

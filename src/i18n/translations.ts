@@ -177,6 +177,12 @@ const en = {
   "settings.notificationsHint": "Lumen can notify you when a reply finishes, even when the tab is in the background.",
   "settings.language": "Language",
   "settings.languageHint": "Choose the display language for Lumen.",
+  "settings.change": "Change",
+  "settings.heroMeta": "{p} providers · {c} saved chats",
+  "settings.aiProviders": "AI Providers",
+  "settings.exportHint": "All chats (JSON)",
+  "settings.importHint": "From JSON file",
+  "settings.clearHint": "Wipe chat history",
 
   // Errors
   "errors.importEmpty": "Import file does not contain any valid chats.",
@@ -365,6 +371,12 @@ const id: Record<TranslationKey, string> = {
   "settings.notificationsHint": "Lumen bisa memberi tahu saat balasan selesai, meski tab di latar belakang.",
   "settings.language": "Bahasa",
   "settings.languageHint": "Pilih bahasa tampilan Lumen.",
+  "settings.change": "Ganti",
+  "settings.heroMeta": "{p} provider · {c} chat tersimpan",
+  "settings.aiProviders": "Provider AI",
+  "settings.exportHint": "Semua chat (JSON)",
+  "settings.importHint": "Dari file JSON",
+  "settings.clearHint": "Bersihkan riwayat",
 
   // Errors
   "errors.importEmpty": "File impor tidak berisi chat yang valid.",

@@ -2,25 +2,36 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProviderDialog, ProviderModelSheet } from "../components/ProviderDialog";
-import { getActiveProvider } from "../services/providers";
 import { Sheet } from "../components/Sheet";
+import { getActiveProvider } from "../services/providers";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
-import { useTheme } from "../theme";
+import { ACCENT_PRESETS, useTheme } from "../theme";
 import { exportChatsJson, parseImportedChats, readTextFile } from "../utils/export";
-import type { ProviderConfig } from "../types/chat";
+import type { ProviderConfig, ProviderId, ThemeMode } from "../types/chat";
 
-function SectionHeader({ icon, label, sub }: { icon: string; label: string; sub?: string }) {
+const PROVIDER_COLORS: Record<ProviderId, string> = {
+  "opencode-go": "#34d399",
+  openai: "#10a37f",
+  "xiaomi-mimo": "#ff6900",
+  anthropic: "#d97757",
+  openrouter: "#6c5ce7",
+  ollama: "#94a3b8",
+  custom: "#4f8cff",
+};
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "L";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
+function SectionLabel({ children }: { children: string }) {
   const { c } = useTheme();
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionLabel, { color: c.muted }]}>{label}</Text>
-      {sub ? <Text style={[styles.sectionSub, { color: c.muted }]}>{sub}</Text> : null}
-    </View>
-  );
+  return <Text style={[styles.sectionLabel, { color: c.muted }]}>{children}</Text>;
 }
 
 function Divider() {
@@ -28,35 +39,51 @@ function Divider() {
   return <View style={[styles.divider, { backgroundColor: c.border }]} />;
 }
 
-function DataActionRow({
-  icon,
-  label,
-  onPress,
-  danger,
+function Segment({
+  options,
+  value,
+  onChange,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  danger?: boolean;
+  options: { key: string; label: string }[];
+  value: string;
+  onChange: (key: string) => void;
 }) {
   const { c } = useTheme();
   return (
-    <Pressable onPress={onPress} style={styles.row}>
-      <Ionicons name={icon} size={18} color={danger ? c.danger : c.text} />
-      <Text style={{ color: danger ? c.danger : c.text, fontSize: 14, fontWeight: "600", flex: 1 }}>
-        {label}
-      </Text>
-    </Pressable>
+    <View style={[styles.segment, { backgroundColor: c.input, borderColor: c.border }]}>
+      {options.map((opt) => {
+        const on = opt.key === value;
+        return (
+          <Pressable
+            key={opt.key}
+            onPress={() => onChange(opt.key)}
+            style={[styles.segmentBtn, on && { backgroundColor: c.accent }]}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "600",
+                color: on ? c.onAccent : c.muted,
+              }}
+            >
+              {opt.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
 export function SettingsScreen() {
   const {
     settings,
+    updateSettings,
     removeProvider,
     setActiveProvider,
     threads,
     importThreads,
+    clearAllChats,
   } = useStore();
   const { t } = useI18n();
   const { c } = useTheme();
@@ -67,8 +94,24 @@ export function SettingsScreen() {
   const [modelSheetOpen, setModelSheetOpen] = useState(false);
   const [editing, setEditing] = useState<ProviderConfig | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ProviderConfig | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameDraft, setNameDraft] = useState(settings.profileName ?? "");
 
   const activeProvider = getActiveProvider(settings);
+  const displayName = settings.profileName?.trim() || "Lumen";
+  const accent = settings.accent ?? c.accent;
+
+  const openNameEdit = () => {
+    setNameDraft(settings.profileName ?? "");
+    setNameEditing(true);
+  };
+
+  const saveName = () => {
+    updateSettings({ profileName: nameDraft.trim() });
+    setNameEditing(false);
+  };
 
   const confirmDelete = () => {
     if (confirmRemove) {
@@ -82,7 +125,10 @@ export function SettingsScreen() {
       <View
         style={[
           styles.header,
-          { backgroundColor: c.surface, borderBottomColor: c.border, paddingTop: insets.top + 6 },
+          {
+            backgroundColor: c.bg,
+            paddingTop: insets.top + 6,
+          },
         ]}
       >
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.headerBtn}>
@@ -93,77 +139,96 @@ export function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <SectionHeader icon="layers-outline" label={t("settings.defaultModel")} sub={t("settings.defaultModelHint")} />
-        <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <Pressable onPress={() => setModelSheetOpen(true)} style={styles.row}>
-            <Ionicons name="hardware-chip-outline" size={18} color={c.text} />
-            <View style={styles.rowBody}>
-              <Text style={[styles.rowTitle, { color: c.text }]}>
-                {activeProvider?.model || t("settings.modelPlaceholder")}
-              </Text>
-              <Text style={[styles.rowSub, { color: c.muted }]} numberOfLines={1}>
-                {activeProvider?.name}
+        <Pressable onPress={openNameEdit} style={styles.hero}>
+          <View style={[styles.avatar, { backgroundColor: c.accent }]}>
+            <Text style={[styles.avatarText, { color: c.onAccent }]}>{initialsOf(displayName)}</Text>
+          </View>
+          <View style={styles.heroBody}>
+            <View style={styles.heroNameLine}>
+              <Text style={[styles.heroName, { color: c.text }]}>{displayName}</Text>
+              <Ionicons name="create-outline" size={14} color={c.muted} />
+            </View>
+            <Text style={[styles.heroSub, { color: c.muted }]}>
+              {t("settings.heroMeta", {
+                p: settings.providers.length,
+                c: threads.length,
+              })}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setModelSheetOpen(true)}
+          style={[styles.modelCard, { backgroundColor: c.surface, borderColor: c.accent + "55" }]}
+        >
+          <Text style={[styles.modelKicker, { color: c.accent }]}>{t("settings.defaultModel")}</Text>
+          <Text style={[styles.modelName, { color: c.text }]} numberOfLines={1}>
+            {activeProvider?.model || t("settings.modelPlaceholder")}
+          </Text>
+          <View style={styles.modelMeta}>
+            <Text style={[styles.modelProvider, { color: c.muted }]} numberOfLines={1}>
+              {activeProvider?.name || "—"}
+            </Text>
+            <View style={[styles.switchPill, { backgroundColor: c.accent + "1f" }]}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: c.accent }}>
+                {t("settings.change")}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={15} color={c.muted} />
-          </Pressable>
-        </View>
+          </View>
+        </Pressable>
 
-        <SectionHeader icon="cloud" label={t("settings.connection")} sub={t("settings.connectionSub")} />
+        <SectionLabel>{t("settings.aiProviders")}</SectionLabel>
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
           {settings.providers.map((provider, index) => {
             const active = provider.id === settings.activeProviderId;
+            const letter = (provider.name?.trim()?.[0] || "P").toUpperCase();
+            const logo = PROVIDER_COLORS[provider.kind] ?? c.accent;
             return (
               <View key={provider.id}>
                 {index > 0 ? <Divider /> : null}
                 <Pressable
                   onPress={() => !active && setActiveProvider(provider.id)}
-                  style={styles.row}
+                  style={styles.providerRow}
                 >
-                  <Pressable
-                    onPress={() => !active && setActiveProvider(provider.id)}
-                    hitSlop={8}
-                    style={styles.rowLeft}
+                  <View
+                    style={[
+                      styles.providerLogo,
+                      {
+                        backgroundColor: logo,
+                        borderWidth: active ? 2 : 0,
+                        borderColor: c.accent,
+                      },
+                    ]}
                   >
-                    <Ionicons
-                      name={active ? "checkmark-circle" : "ellipse-outline"}
-                      size={20}
-                      color={active ? c.accent : c.muted}
-                    />
-                  </Pressable>
+                    <Text style={styles.providerLetter}>{letter}</Text>
+                  </View>
                   <View style={styles.rowBody}>
-                    <View style={styles.rowTitleLine}>
-                      <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
-                        {provider.name}
-                      </Text>
-                      {active ? (
-                        <View style={[styles.badge, { backgroundColor: c.accent + "1f" }]}>
-                          <Text style={{ fontSize: 10, fontWeight: "700", color: c.accent }}>
-                            {t("settings.active")}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
+                    <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
+                      {provider.name}
+                    </Text>
                     <Text style={[styles.rowSub, { color: c.muted }]} numberOfLines={1}>
                       {provider.model} · {provider.apiFormat}
                     </Text>
                   </View>
+                  {active ? (
+                    <Ionicons name="checkmark-circle" size={20} color={c.accent} />
+                  ) : null}
                   <Pressable
                     onPress={() => {
                       setEditing(provider);
                       setDialogOpen(true);
                     }}
-                    hitSlop={6}
+                    hitSlop={8}
                     style={styles.rowAction}
                   >
-                    <Ionicons name="pencil-outline" size={16} color={c.muted} />
+                    <Ionicons name="pencil-outline" size={15} color={c.muted} />
                   </Pressable>
                   <Pressable
                     onPress={() => setConfirmRemove(provider)}
-                    hitSlop={6}
+                    hitSlop={8}
                     style={styles.rowAction}
                   >
-                    <Ionicons name="trash-outline" size={16} color={c.muted} />
+                    <Ionicons name="trash-outline" size={15} color={c.muted} />
                   </Pressable>
                 </Pressable>
               </View>
@@ -184,40 +249,65 @@ export function SettingsScreen() {
           </Pressable>
         </View>
 
-        <SectionHeader
-          icon="color-palette"
-          label={t("profile.appearance")}
-          sub={t("settings.appearanceSub")}
-        />
+        <SectionLabel>{t("profile.appearance")}</SectionLabel>
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <Pressable onPress={() => router.push("/profile")} style={styles.row}>
-            <Ionicons name="color-palette-outline" size={18} color={c.text} />
-            <View style={styles.rowBody}>
-              <Text style={[styles.rowTitle, { color: c.text }]}>{t("profile.appearance")}</Text>
-              <Text style={[styles.rowSub, { color: c.muted }]}>
-                {settings.theme === "dark" ? t("common.dark") : t("common.light")} ·{" "}
-                {settings.language === "en" ? t("common.english") : t("common.indonesian")}
-              </Text>
+          <View style={styles.inlineRow}>
+            <Text style={[styles.rowTitle, { color: c.text }]}>{t("settings.theme")}</Text>
+            <Segment
+              options={[
+                { key: "dark", label: t("common.dark") },
+                { key: "light", label: t("common.light") },
+              ]}
+              value={settings.theme}
+              onChange={(key) => updateSettings({ theme: key as ThemeMode })}
+            />
+          </View>
+          <Divider />
+          <View style={styles.inlineRow}>
+            <Text style={[styles.rowTitle, { color: c.text }]}>{t("profile.accent")}</Text>
+            <View style={styles.dots}>
+              {ACCENT_PRESETS.map((preset) => (
+                <Pressable
+                  key={preset.hex}
+                  onPress={() => updateSettings({ accent: preset.hex })}
+                  style={[
+                    styles.dot,
+                    { backgroundColor: preset.hex },
+                    accent === preset.hex && styles.dotSelected,
+                  ]}
+                />
+              ))}
             </View>
-            <Ionicons name="chevron-forward" size={15} color={c.muted} />
-          </Pressable>
+          </View>
+          <Divider />
+          <View style={styles.inlineRow}>
+            <Text style={[styles.rowTitle, { color: c.text }]}>{t("settings.language")}</Text>
+            <Segment
+              options={[
+                { key: "id", label: "ID" },
+                { key: "en", label: "EN" },
+              ]}
+              value={settings.language}
+              onChange={(key) => updateSettings({ language: key as "id" | "en" })}
+            />
+          </View>
         </View>
 
-        <SectionHeader icon="server" label={t("settings.data")} sub={t("settings.dataSub")} />
-        <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <DataActionRow
-            icon="download-outline"
-            label={t("settings.exportAll")}
+        <SectionLabel>{t("settings.data")}</SectionLabel>
+        <View style={styles.tileGrid}>
+          <Pressable
             onPress={() => {
               void exportChatsJson(threads).catch(() => {
                 Alert.alert(t("errors.requestFailed"));
               });
             }}
-          />
-          <Divider />
-          <DataActionRow
-            icon="cloud-upload-outline"
-            label={t("settings.importChats")}
+            style={[styles.tile, { backgroundColor: c.surface, borderColor: c.border }]}
+          >
+            <Ionicons name="download-outline" size={18} color={c.text} />
+            <Text style={[styles.tileLabel, { color: c.text }]}>{t("settings.exportAll")}</Text>
+            <Text style={[styles.tileSub, { color: c.muted }]}>{t("settings.exportHint")}</Text>
+          </Pressable>
+          <Pressable
             onPress={() => {
               void (async () => {
                 const res = await DocumentPicker.getDocumentAsync({
@@ -234,17 +324,31 @@ export function SettingsScreen() {
                 importThreads(imported);
               })();
             }}
-          />
-          <Divider />
-          <View style={styles.row}>
-            <View style={styles.rowBody}>
-              <Text style={[styles.rowTitle, { color: c.text }]}>{t("settings.storage")}</Text>
-              <Text style={[styles.rowSub, { color: c.muted }]}>{t("settings.storageHint")}</Text>
-            </View>
-          </View>
+            style={[styles.tile, { backgroundColor: c.surface, borderColor: c.border }]}
+          >
+            <Ionicons name="cloud-upload-outline" size={18} color={c.text} />
+            <Text style={[styles.tileLabel, { color: c.text }]}>{t("settings.importChats")}</Text>
+            <Text style={[styles.tileSub, { color: c.muted }]}>{t("settings.importHint")}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setConfirmClear(true)}
+            style={[styles.tile, { backgroundColor: c.surface, borderColor: c.border }]}
+          >
+            <Ionicons name="trash-outline" size={18} color={c.danger} />
+            <Text style={[styles.tileLabel, { color: c.danger }]}>{t("profile.clearAll")}</Text>
+            <Text style={[styles.tileSub, { color: c.muted }]}>{t("settings.clearHint")}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setAboutOpen(true)}
+            style={[styles.tile, { backgroundColor: c.surface, borderColor: c.border }]}
+          >
+            <Ionicons name="information-circle-outline" size={18} color={c.text} />
+            <Text style={[styles.tileLabel, { color: c.text }]}>{t("profile.about")}</Text>
+            <Text style={[styles.tileSub, { color: c.muted }]}>{t("profile.aboutSub")}</Text>
+          </Pressable>
         </View>
 
-        <Text style={[styles.version, { color: c.muted }]}>Lumen mobile 0.2.0</Text>
+        <Text style={[styles.version, { color: c.muted }]}>Lumen mobile 0.3.0</Text>
       </ScrollView>
 
       <ProviderDialog visible={dialogOpen} editing={editing} onClose={() => setDialogOpen(false)} />
@@ -261,19 +365,62 @@ export function SettingsScreen() {
           {t("settings.editProvider")} — {confirmRemove?.name}
         </Text>
         <View style={styles.sheetActions}>
-          <Pressable
-            onPress={() => setConfirmRemove(null)}
-            style={[styles.ghostBtn, { borderColor: c.border }]}
-          >
+          <Pressable onPress={() => setConfirmRemove(null)} style={[styles.ghostBtn, { borderColor: c.border }]}>
+            <Text style={{ color: c.muted, fontSize: 13 }}>{t("common.cancel")}</Text>
+          </Pressable>
+          <Pressable onPress={confirmDelete} style={[styles.dangerBtn, { backgroundColor: c.danger }]}>
+            <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: "600" }}>{t("common.remove")}</Text>
+          </Pressable>
+        </View>
+      </Sheet>
+
+      <Sheet visible={confirmClear} title={t("profile.clearAll")} onClose={() => setConfirmClear(false)}>
+        <Text style={{ color: c.muted, fontSize: 14, marginBottom: 14 }}>{t("profile.clearAllConfirm")}</Text>
+        <View style={styles.sheetActions}>
+          <Pressable onPress={() => setConfirmClear(false)} style={[styles.ghostBtn, { borderColor: c.border }]}>
             <Text style={{ color: c.muted, fontSize: 13 }}>{t("common.cancel")}</Text>
           </Pressable>
           <Pressable
-            onPress={confirmDelete}
+            onPress={() => {
+              setConfirmClear(false);
+              clearAllChats();
+            }}
             style={[styles.dangerBtn, { backgroundColor: c.danger }]}
           >
-            <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: "600" }}>
-              {t("common.remove")}
-            </Text>
+            <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: "600" }}>{t("common.remove")}</Text>
+          </Pressable>
+        </View>
+      </Sheet>
+
+      <Sheet visible={nameEditing} title={t("profile.name")} onClose={() => setNameEditing(false)}>
+        <Text style={{ color: c.muted, fontSize: 12, marginBottom: 8 }}>{t("profile.nameHint")}</Text>
+        <TextInput
+          value={nameDraft}
+          onChangeText={setNameDraft}
+          autoFocus
+          placeholder="Atha"
+          placeholderTextColor={c.muted}
+          style={[styles.input, { color: c.text, backgroundColor: c.input, borderColor: c.border }]}
+        />
+        <View style={styles.sheetActions}>
+          <Pressable onPress={() => setNameEditing(false)} style={[styles.ghostBtn, { borderColor: c.border }]}>
+            <Text style={{ color: c.muted, fontSize: 13 }}>{t("common.cancel")}</Text>
+          </Pressable>
+          <Pressable onPress={saveName} style={[styles.primaryBtn, { backgroundColor: c.accent }]}>
+            <Text style={{ color: c.onAccent, fontSize: 13, fontWeight: "600" }}>{t("common.save")}</Text>
+          </Pressable>
+        </View>
+      </Sheet>
+
+      <Sheet visible={aboutOpen} title={t("profile.about")} onClose={() => setAboutOpen(false)}>
+        <Text style={{ color: c.text, fontSize: 15, fontWeight: "700", marginBottom: 6 }}>Lumen mobile</Text>
+        <Text style={{ color: c.muted, fontSize: 13, lineHeight: 20, marginBottom: 12 }}>
+          {t("profile.aboutSub")}
+        </Text>
+        <Text style={{ color: c.muted, fontSize: 12, marginBottom: 16 }}>{t("settings.storageHint")}</Text>
+        <View style={styles.sheetActions}>
+          <Pressable onPress={() => setAboutOpen(false)} style={[styles.primaryBtn, { backgroundColor: c.accent }]}>
+            <Text style={{ color: c.onAccent, fontSize: 13, fontWeight: "600" }}>{t("common.close")}</Text>
           </Pressable>
         </View>
       </Sheet>
@@ -286,41 +433,138 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingBottom: 8,
+    paddingBottom: 4,
     paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerBtn: { padding: 8, width: 38 },
   headerTitle: { flex: 1, textAlign: "center", fontSize: 15, fontWeight: "600" },
-  content: { padding: 14, paddingBottom: 40 },
-  sectionHeader: { marginTop: 14, marginBottom: 6, paddingHorizontal: 2 },
-  sectionLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
-  sectionSub: { fontSize: 12, marginTop: 2 },
-  card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
-  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
-  row: {
+  content: { paddingHorizontal: 14, paddingBottom: 40 },
+  hero: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 4,
+    paddingVertical: 10,
+    marginBottom: 6,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { fontSize: 20, fontWeight: "800" },
+  heroBody: { flex: 1 },
+  heroNameLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  heroName: { fontSize: 18, fontWeight: "700" },
+  heroSub: { fontSize: 12, marginTop: 2 },
+  modelCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 4,
+  },
+  modelKicker: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  modelName: { fontSize: 16, fontWeight: "700", marginTop: 4 },
+  modelMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    gap: 10,
+  },
+  modelProvider: { flex: 1, fontSize: 12 },
+  switchPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 18,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  divider: { height: StyleSheet.hairlineWidth },
+  providerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    gap: 6,
   },
-  rowLeft: { paddingVertical: 2 },
-  rowBody: { flex: 1 },
-  rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  providerLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  providerLetter: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  rowBody: { flex: 1, minWidth: 0 },
   rowTitle: { fontSize: 14, fontWeight: "600" },
   rowSub: { fontSize: 12, marginTop: 2 },
-  badge: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  rowAction: { padding: 4 },
+  rowAction: { padding: 6 },
   addRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingVertical: 12,
   },
-  version: { textAlign: "center", fontSize: 11, marginTop: 18 },
+  inlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  segment: {
+    flexDirection: "row",
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 2,
+    gap: 2,
+  },
+  segmentBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9 },
+  dots: { flexDirection: "row", gap: 8, alignItems: "center" },
+  dot: { width: 18, height: 18, borderRadius: 9 },
+  dotSelected: {
+    borderWidth: 2,
+    borderColor: "#ededed",
+  },
+  tileGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  tile: {
+    width: "48%",
+    flexGrow: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 8,
+  },
+  tileLabel: { fontSize: 13, fontWeight: "600" },
+  tileSub: { fontSize: 11, lineHeight: 15 },
+  version: { textAlign: "center", fontSize: 11, marginTop: 20 },
   sheetActions: { flexDirection: "row", gap: 8, marginTop: 12, justifyContent: "flex-end" },
   ghostBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1 },
   dangerBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
+  primaryBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
+  input: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
 });
