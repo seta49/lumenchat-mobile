@@ -1,6 +1,9 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import * as SystemUI from "expo-system-ui";
+import { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { I18nProvider } from "../i18n";
@@ -10,6 +13,12 @@ import { ThemeProvider, useTheme } from "../theme";
 function ThemedRoot() {
   const { c } = useTheme();
   const { ready, settings } = useStore();
+
+  // Warna window background = warna tema (hilangkan gap putih status/nav bar)
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(c.bg);
+  }, [c.bg]);
+
   if (!ready) {
     return <View style={{ flex: 1, backgroundColor: c.bg }} />;
   }
@@ -40,12 +49,18 @@ function Root() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <KeyboardProvider>
-        <StoreProvider>
-          <Root />
-        </StoreProvider>
-      </KeyboardProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.flex}>
+      <SafeAreaProvider>
+        <KeyboardProvider>
+          <StoreProvider>
+            <Root />
+          </StoreProvider>
+        </KeyboardProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+});
