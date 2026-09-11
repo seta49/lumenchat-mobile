@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { useTheme } from "../theme";
+import { FONTS } from "../fonts";
 
 /** Render LaTeX pakai KaTeX di WebView. Kalau gagal → tampilkan code block biasa. */
 export function MathView({ tex, display }: { tex: string; display?: boolean }) {
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   codeText: {
-    fontFamily: "monospace",
+    fontFamily: FONTS.mono,
     fontSize: 13,
     lineHeight: 18,
   },
