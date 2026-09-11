@@ -13,7 +13,6 @@ import { pickAndCompressImage } from "../utils/image";
 import { useOptionalVoice } from "../utils/voice";
 import type { ContentPart } from "../types/chat";
 import { Sheet } from "./Sheet";
-import { ThinkingSheet } from "./ThinkingSheet";
 
 interface FileAttachment {
   name: string;
@@ -23,7 +22,7 @@ interface FileAttachment {
 /** Composer: pill [+][input][reasoning][send], keyboard-aware native,
  * attach gambar + dokumen (txt/md/json/csv/kode). */
 export function Composer() {
-  const { settings, streamingId, send, stop, updateSettings } = useStore();
+  const { settings, streamingId, send, stop, updateSettings, setThinking } = useStore();
   const { t } = useI18n();
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -31,7 +30,6 @@ export function Composer() {
   const [images, setImages] = useState<ContentPart[]>([]);
   const [files, setFiles] = useState<FileAttachment[]>([]);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [reasoningOpen, setReasoningOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(false);
 
   // Share intent (SEND text/plain) → isi composer sekali.
@@ -191,7 +189,7 @@ export function Composer() {
         />
 
         <Pressable
-          onPress={() => setReasoningOpen(true)}
+          onPress={() => setThinking(thinkingOn ? "off" : "max")}
           hitSlop={6}
           style={[
             styles.reasonChip,
@@ -253,8 +251,6 @@ export function Composer() {
           <Text style={{ color: c.text, fontSize: 14 }}>{t("chat.attachFile")}</Text>
         </Pressable>
       </Sheet>
-
-      <ThinkingSheet visible={reasoningOpen} onClose={() => setReasoningOpen(false)} />
     </View>
   );
 }
