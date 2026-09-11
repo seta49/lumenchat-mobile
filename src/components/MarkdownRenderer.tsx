@@ -289,21 +289,22 @@ function pushInlineMath(text: string, out: Seg[]) {
 function NativeTable({ header, rows }: { header: string[]; rows: string[][] }) {
   const { c } = useTheme();
   const cols = header.length;
+  const strip = (s: string) => s.replace(/\*\*|__/g, "").trim();
 
-  // Lebar kolom: berdasarkan konten terpanjang, di-clamp biar rapi
+  // Lebar kolom: fit ke teks terpanjang di kolom itu sendiri
   const colWidths = useMemo(() => {
     const widths: number[] = [];
     for (let i = 0; i < cols; i++) {
-      let maxLen = (header[i] ?? "").length;
-      for (const row of rows) {
-        maxLen = Math.max(maxLen, (row[i] ?? "").length);
+      const cells = [header[i] ?? "", ...rows.map((r) => r[i] ?? "")];
+      let maxLen = 0;
+      for (const cell of cells) {
+        maxLen = Math.max(maxLen, strip(cell).length);
       }
-      widths.push(Math.min(Math.max(maxLen * 7.5 + 28, 110), 200));
+      // ~7px/char + padding 20; min 52 (angka), max 180
+      widths.push(Math.min(Math.max(Math.round(maxLen * 7) + 20, 52), 180));
     }
     return widths;
   }, [header, rows, cols]);
-
-  const strip = (s: string) => s.replace(/\*\*|__/g, "").trim();
 
   return (
     <View style={[stylesTable.wrap, { borderColor: c.border }]}>
@@ -506,8 +507,7 @@ const stylesTable = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   cell: {
-    minWidth: 110,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 8,
     borderRightWidth: StyleSheet.hairlineWidth,
     justifyContent: "center",
