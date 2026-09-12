@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen — Settings Sub-menus</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#000;--surface:#0d0d0d;--card:#141414;--border:#1f1f1f;--text:#ededed;--muted:#666;--accent:#4f8cff;--input:#111}
+body{background:#0a0a0a;font-family:-apple-system,'SF Pro Display','Inter',system-ui,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;gap:28px;flex-wrap:wrap}
+.phone{width:340px;height:740px;background:var(--bg);border-radius:36px;overflow:hidden;position:relative;border:2.5px solid #222;display:flex;flex-direction:column;box-shadow:0 0 60px rgba(0,0,0,0.4)}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:10px 22px 0;font-size:11px;color:#555;font-weight:600;flex-shrink:0}
+.chat{flex:1;display:flex;flex-direction:column}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;flex-shrink:0}
+.hdr .l{display:flex;align-items:center;gap:8px}
+.logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#4f8cff,#6366f1);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
+.hdr .r{display:flex;gap:1px}
+.hb{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:0 0;border:none;cursor:pointer;color:#555;font-size:15px}
+.mchip{display:flex;align-items:center;gap:5px;padding:4px 9px 4px 7px;border-radius:9px;background:var(--card);border:1px solid var(--border);cursor:pointer}
+.mchip .d{width:5px;height:5px;border-radius:50%;background:#34d399}
+.mchip .n{font-size:12px;color:var(--text);font-weight:600}
+.mchip .c{font-size:9px;color:#444}
+.cbody{flex:1;overflow-y:auto;padding:6px 12px 100px;display:flex;flex-direction:column}
+.cbody::-webkit-scrollbar{width:0}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:60px}
+.eico{width:42px;height:42px;border-radius:14px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:18px}
+.etit{font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px}
+.esub{font-size:12px;color:#444}
+.cwrap{position:absolute;bottom:0;left:0;right:0;padding:0 10px 24px;background:linear-gradient(transparent 0%,var(--bg) 30%)}
+.cmp{display:flex;align-items:flex-end;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:22px;padding:5px 5px 5px 14px}
+.cmp input{flex:1;background:0 0;border:none;outline:0;color:var(--text);font-size:14px;padding:9px 0}
+.cmp input::placeholder{color:#333}
+.cb{width:32px;height:32px;border-radius:50%;background:0 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#444;font-size:15px;flex-shrink:0}
+.sb2{width:34px;height:34px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb2.dis{opacity:.25}.sb2 svg{fill:#fff}
+
+/* SETTINGS OVERLAY */
+.setov{position:absolute;inset:0;z-index:40;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end}
+.setsheet{width:100%;height:100%;background:var(--surface);display:flex;flex-direction:column}
+
+/* SETTINGS HEADER */
+.set-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.set-back{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:0 0;border:none;cursor:pointer;color:var(--accent);font-size:18px}
+.set-title{font-size:17px;font-weight:700;color:var(--text)}
+
+/* SCROLLABLE CONTENT */
+.set-scroll{flex:1;overflow-y:auto;padding:0 0 28px}
+.set-scroll::-webkit-scrollbar{width:0}
+
+/* SECTION */
+.section{margin-top:18px}
+.section-label{font-size:11px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:.5px;padding:0 18px;margin-bottom:6px}
+.section-card{margin:0 12px;border-radius:14px;background:var(--card);border:1px solid var(--border);overflow:hidden}
+
+/* ROW */
+.srow{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer;transition:background .1s}
+.srow:hover{background:#1a1a1a}
+.srow+.srow{border-top:1px solid var(--border)}
+.sl{display:flex;flex-direction:column;flex:1;min-width:0}
+.slbl{font-size:14px;color:var(--text);font-weight:500}
+.sdesc{font-size:11px;color:#555;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.sval{font-size:12px;color:var(--accent);font-weight:500}
+.sarr{font-size:14px;color:#333}
+.toggle{width:40px;height:24px;border-radius:12px;background:var(--accent);position:relative;cursor:pointer;flex-shrink:0}
+.toggle::after{content:'';position:absolute;top:3px;left:20px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
+.toggle.off{background:#333}.toggle.off::after{left:3px}
+.accent-dots{display:flex;gap:6px}
+.accent-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+.accent-dot.sel{border-color:var(--text)}
+.danger{color:#f87171 !important}
+.danger-bg{background:rgba(248,113,113,0.08)}
+
+.label{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-size:11px;color:#444;font-weight:600;background:#181818;padding:3px 12px;border-radius:6px;white-space:nowrap;z-index:50}
+</style>
+</head>
+<body>
+
+<!-- ============ 1: MAIN SETTINGS ============ -->
+<div class="phone" style="position:relative">
+  <div class="label">Settings · Menu Utama</div>
+  <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+  <div class="chat">
+    <div class="hdr"><div class="l"><div class="logo">L</div><div class="mchip"><span class="d"></span><span class="n">deepseek-v4-flash</span><span class="c">▾</span></div></div><div class="r"><button class="hb">+</button><button class="hb">⚙</button></div></div>
+    <div class="cbody"><div class="empty"><div class="eico">💬</div><div class="etit">Mau ngobrol apa?</div><div class="esub">Ketik di bawah buat mulai.</div></div></div>
+    <div class="cwrap"><div class="cmp"><input placeholder="Tanya sesuatu..." /><button class="cb">📎</button><button class="sb2 dis"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div></div>
+  </div>
+  <div class="setov">
+    <div class="setsheet">
+      <div class="set-hdr"><button class="set-back">‹</button><span class="set-title">Settings</span></div>
+      <div class="set-scroll">
+        <div class="section">
+          <div class="section-label">Provider</div>
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Provider & API Key</span><span class="sdesc">OpenCode Go · ocg-xxxx••••</span></div><div class="sr"><span class="sarr">›</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Model Aktif</span><span class="sdesc">deepseek-v4-flash</span></div><div class="sr"><span class="sarr">›</span></div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Model</div>
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Default Model</span><span class="sdesc">deepseek-v4-flash</span></div><div class="sr"><span class="sarr">›</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Reasoning</span><span class="sdesc">Off</span></div><div class="sr"><span class="sarr">›</span></div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Appearance</div>
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Tema</span><span class="sdesc">Dark</span></div><div class="toggle"></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Accent Color</span></div><div class="accent-dots"><div class="accent-dot sel" style="background:#4f8cff"></div><div class="accent-dot" style="background:#34d399"></div><div class="accent-dot" style="background:#a78bfa"></div><div class="accent-dot" style="background:#fb923c"></div><div class="accent-dot" style="background:#f472b6"></div></div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Lainnya</div>
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Bahasa</span><span class="sdesc">Indonesia</span></div><div class="sr"><span class="sarr">›</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Nama Profil</span><span class="sdesc">Atha</span></div><div class="sr"><span class="sarr">›</span></div></div>
+          </div>
+        </div>
+        <div class="section" style="margin-bottom:0">
+          <div class="section-card">
+            <div class="srow danger-bg"><div class="sl"><span class="slbl danger">Hapus Semua Chat</span></div><div class="sr"><span class="sarr">›</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 2: SUB PROVIDER ============ -->
+<div class="phone" style="position:relative">
+  <div class="label">Settings · Provider</div>
+  <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+  <div class="chat">
+    <div class="hdr"><div class="l"><div class="logo">L</div><div class="mchip"><span class="d"></span><span class="n">deepseek-v4-flash</span><span class="c">▾</span></div></div><div class="r"><button class="hb">+</button><button class="hb">⚙</button></div></div>
+    <div class="cbody"><div class="empty"><div class="eico">💬</div><div class="etit">Mau ngobrol apa?</div><div class="esub">Ketik di bawah buat mulai.</div></div></div>
+    <div class="cwrap"><div class="cmp"><input placeholder="Tanya sesuatu..." /><button class="cb">📎</button><button class="sb2 dis"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div></div>
+  </div>
+  <div class="setov">
+    <div class="setsheet">
+      <div class="set-hdr"><button class="set-back">‹</button><span class="set-title">Provider</span></div>
+      <div class="set-scroll">
+        <div class="section" style="margin-top:12px">
+          <div class="section-label">Provider Aktif</div>
+          <div class="section-card">
+            <div class="srow" style="background:#4f8cff08"><div class="sl"><span class="slbl">OpenCode Go</span><span class="sdesc">ocg-xxxx•••• · 36 model</span></div><div class="sr"><span style="font-size:10px;color:var(--accent);font-weight:700">AKTIF</span></div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Semua Provider</div>
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Xiaomi MiMo</span><span class="sdesc">tp-xxxx•••• · 2 model</span></div><div class="sr"><span class="sarr">›</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">OpenRouter</span><span class="sdesc">sk-or-xxxx•••• · 120+ model</span></div><div class="sr"><span class="sarr">›</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Anthropic</span><span class="sdesc">sk-ant-xxxx•••• · 4 model</span></div><div class="sr"><span class="sarr">›</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Ollama (Local)</span><span class="sdesc">localhost:11434 · 5 model</span></div><div class="sr"><span class="sarr">›</span></div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl" style="color:var(--accent)">+ Tambah Provider</span></div><div class="sr"><span class="sarr">›</span></div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Koneksi</div>
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Test Connection</span><span class="sdesc">Terakhir: sukses · 120ms</span></div><div class="sr"><span class="sarr">›</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 3: SUB MODEL ============ -->
+<div class="phone" style="position:relative">
+  <div class="label">Settings · Model</div>
+  <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+  <div class="chat">
+    <div class="hdr"><div class="l"><div class="logo">L</div><div class="mchip"><span class="d"></span><span class="n">deepseek-v4-flash</span><span class="c">▾</span></div></div><div class="r"><button class="hb">+</button><button class="hb">⚙</button></div></div>
+    <div class="cbody"><div class="empty"><div class="eico">💬</div><div class="etit">Mau ngobrol apa?</div><div class="esub">Ketik di bawah buat mulai.</div></div></div>
+    <div class="cwrap"><div class="cmp"><input placeholder="Tanya sesuatu..." /><button class="cb">📎</button><button class="sb2 dis"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div></div>
+  </div>
+  <div class="setov">
+    <div class="setsheet">
+      <div class="set-hdr"><button class="set-back">‹</button><span class="set-title">Model</span></div>
+      <div class="set-scroll">
+        <div class="section" style="margin-top:12px">
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Default Model</span><span class="sdesc">deepseek-v4-flash</span></div><div class="sr"><span class="sval">Ganti</span><span class="sarr">›</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Reasoning</span><span class="sdesc">Off</span></div><div class="sr"><span class="sval">Ganti</span><span class="sarr">›</span></div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Info</div>
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Provider</span><span class="sdesc">OpenCode Go</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Context Window</span><span class="sdesc">128K tokens</span></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Tipe</span><span class="sdesc">Fast · Non-reasoning</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 4: SUB APPEARANCE ============ -->
+<div class="phone" style="position:relative">
+  <div class="label">Settings · Appearance</div>
+  <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+  <div class="chat">
+    <div class="hdr"><div class="l"><div class="logo">L</div><div class="mchip"><span class="d"></span><span class="n">deepseek-v4-flash</span><span class="c">▾</span></div></div><div class="r"><button class="hb">+</button><button class="hb">⚙</button></div></div>
+    <div class="cbody"><div class="empty"><div class="eico">💬</div><div class="etit">Mau ngobrol apa?</div><div class="esub">Ketik di bawah buat mulai.</div></div></div>
+    <div class="cwrap"><div class="cmp"><input placeholder="Tanya sesuatu..." /><button class="cb">📎</button><button class="sb2 dis"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div></div>
+  </div>
+  <div class="setov">
+    <div class="setsheet">
+      <div class="set-hdr"><button class="set-back">‹</button><span class="set-title">Appearance</span></div>
+      <div class="set-scroll">
+        <div class="section" style="margin-top:12px">
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Tema</span><span class="sdesc">Dark</span></div><div class="toggle"></div></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Accent Color</div>
+          <div class="section-card">
+            <div class="srow"><div class="sl"><span class="slbl">Biru</span></div><div class="accent-dot sel" style="background:#4f8cff"></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Hijau</span></div><div class="accent-dot" style="background:#34d399"></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Ungu</span></div><div class="accent-dot" style="background:#a78bfa"></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Oranye</span></div><div class="accent-dot" style="background:#fb923c"></div></div>
+            <div class="srow"><div class="sl"><span class="slbl">Pink</span></div><div class="accent-dot" style="background:#f472b6"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

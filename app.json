@@ -10,16 +10,6 @@
     "ios": {
       "icon": "./assets/expo.icon"
     },
-    "androidStatusBar": {
-      "backgroundColor": "#000000",
-      "barStyle": "light-content",
-      "translucent": false
-    },
-    "androidNavigationBar": {
-      "backgroundColor": "#000000",
-      "barStyle": "light-content",
-      "visible": "visible"
-    },
     "android": {
       "package": "com.setab49.lumen",
       "adaptiveIcon": {

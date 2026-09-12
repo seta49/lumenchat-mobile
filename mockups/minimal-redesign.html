@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen — Minimal Redesign</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #000; --surface: #0d0d0d; --card: #141414;
+  --border: #1f1f1f; --text: #ededed; --muted: #666;
+  --accent: #4f8cff; --input: #111;
+}
+body {
+  background: #111; font-family: -apple-system, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; padding: 20px; gap: 32px; flex-wrap: wrap;
+}
+
+/* === PHONE FRAME === */
+.phone {
+  width: 375px; height: 812px; background: var(--bg);
+  border-radius: 40px; overflow: hidden; position: relative;
+  border: 3px solid #222; display: flex; flex-direction: column;
+  box-shadow: 0 0 80px rgba(0,0,0,0.5);
+}
+
+/* === STATUS BAR === */
+.status-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 28px 0; font-size: 13px; color: #555;
+  font-weight: 600; flex-shrink: 0;
+}
+
+/* ============================================================
+   SCREEN 1: SETUP (API Key input)
+   ============================================================ */
+.setup-screen {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  padding: 0 32px;
+}
+.setup-logo {
+  width: 64px; height: 64px; border-radius: 20px;
+  background: linear-gradient(135deg, #4f8cff, #6366f1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 800; color: #fff;
+  margin-bottom: 20px;
+}
+.setup-title { font-size: 28px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.setup-sub { font-size: 14px; color: var(--muted); margin-bottom: 36px; text-align: center; line-height: 1.5; }
+.setup-field { width: 100%; margin-bottom: 14px; }
+.setup-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; font-weight: 600; letter-spacing: 0.3px; }
+.setup-input {
+  width: 100%; padding: 14px 16px; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-size: 15px; outline: none;
+  transition: border-color 0.2s;
+}
+.setup-input:focus { border-color: var(--accent); }
+.setup-input::placeholder { color: #333; }
+.setup-input-row {
+  display: flex; gap: 8px; align-items: center;
+}
+.setup-input-row input { flex: 1; }
+.setup-select {
+  padding: 14px 12px; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-size: 14px; outline: none;
+  min-width: 120px; cursor: pointer;
+  -webkit-appearance: none;
+}
+.setup-hint {
+  font-size: 11px; color: #444; margin-top: 6px; line-height: 1.4;
+}
+.setup-btn {
+  width: 100%; padding: 15px; border-radius: 14px;
+  background: var(--accent); border: none; cursor: pointer;
+  color: #fff; font-size: 16px; font-weight: 700;
+  margin-top: 10px; transition: opacity 0.15s;
+}
+.setup-btn:active { opacity: 0.8; }
+.setup-btn:disabled { opacity: 0.3; cursor: default; }
+.setup-divider {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; margin: 20px 0; color: #333; font-size: 12px;
+}
+.setup-divider::before, .setup-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+.setup-presets {
+  width: 100%; display: flex; flex-direction: column; gap: 8px;
+}
+.preset-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.15s; width: 100%;
+}
+.preset-btn:hover { border-color: #333; }
+.preset-left { display: flex; align-items: center; gap: 10px; }
+.preset-icon {
+  width: 32px; height: 32px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; color: #fff;
+}
+.preset-name { font-size: 14px; color: var(--text); font-weight: 600; }
+.preset-desc { font-size: 11px; color: #444; }
+.preset-arrow { color: #333; font-size: 16px; }
+
+/* ============================================================
+   SCREEN 2: CHAT
+   ============================================================ */
+.chat-screen { flex: 1; display: flex; flex-direction: column; }
+
+/* Minimal header */
+.chat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; flex-shrink: 0;
+}
+.chat-header .left { display: flex; align-items: center; gap: 10px; }
+.logo-sm {
+  width: 28px; height: 28px; border-radius: 9px;
+  background: linear-gradient(135deg, #4f8cff, #6366f1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+}
+.header-model {
+  font-size: 13px; color: var(--muted); font-weight: 500;
+}
+.header-actions { display: flex; gap: 2px; }
+.h-btn {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; cursor: pointer;
+  color: #555; font-size: 16px; transition: all 0.12s;
+}
+.h-btn:hover { background: var(--card); color: #999; }
+
+/* Chat area */
+.chat-body {
+  flex: 1; overflow-y: auto; padding: 8px 16px 120px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.chat-body::-webkit-scrollbar { width: 0; }
+
+/* Empty state */
+.empty-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding-bottom: 80px;
+}
+.empty-icon {
+  width: 48px; height: 48px; border-radius: 16px;
+  background: var(--card); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px; font-size: 20px;
+}
+.empty-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.empty-sub { font-size: 13px; color: #444; }
+
+/* Messages */
+.msg { display: flex; gap: 8px; align-items: flex-end; }
+.msg.user { flex-direction: row-reverse; }
+.msg-avatar {
+  width: 24px; height: 24px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; color: #fff;
+}
+.msg-avatar.ai { background: linear-gradient(135deg, #4f8cff, #6366f1); }
+.bubble {
+  max-width: 85%; padding: 10px 14px; font-size: 15px; line-height: 1.55;
+}
+.bubble.ai {
+  background: var(--card); color: #d4d4d4;
+  border-radius: 4px 18px 18px 18px;
+}
+.bubble.user {
+  background: #1a2744; color: var(--text);
+  border-radius: 18px 18px 4px 18px;
+}
+.bubble code {
+  background: #1a1a1a; padding: 2px 6px; border-radius: 5px;
+  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; color: #a78bfa;
+}
+.bubble .code-block {
+  display: block; background: #0a0a0a; border-radius: 10px;
+  padding: 12px 14px; margin: 10px -2px; font-size: 13px;
+  border: 1px solid var(--border); overflow-x: auto; white-space: pre;
+  font-family: 'SF Mono', 'Fira Code', monospace; color: #d4d4d4; line-height: 1.5;
+}
+.bubble-actions {
+  display: flex; gap: 2px; margin-top: 8px;
+  opacity: 0; transition: opacity 0.15s;
+}
+.msg:hover .bubble-actions { opacity: 1; }
+.b-act {
+  padding: 4px 10px; border-radius: 8px; font-size: 11px;
+  background: transparent; border: 1px solid var(--border); cursor: pointer;
+  color: #555; display: flex; align-items: center; gap: 4px;
+  transition: all 0.12s;
+}
+.b-act:hover { background: var(--card); color: #999; }
+.typing-dots { display: flex; gap: 4px; padding: 4px 0; }
+.t-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  animation: blink 1.2s infinite;
+}
+.t-dot:nth-child(2) { animation-delay: 0.2s; }
+.t-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,60%,100% { opacity: 0.2; } 30% { opacity: 1; } }
+
+/* Composer */
+.composer-wrap {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 0 12px 30px;
+  background: linear-gradient(transparent 0%, var(--bg) 35%);
+}
+.composer {
+  display: flex; align-items: flex-end; gap: 8px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 24px; padding: 6px 6px 6px 16px;
+}
+.composer input {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--text); font-size: 15px; padding: 10px 0;
+}
+.composer input::placeholder { color: #333; }
+.c-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: transparent; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #444; font-size: 16px; transition: all 0.12s; flex-shrink: 0;
+}
+.c-btn:hover { color: #999; }
+.send-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: transform 0.1s;
+}
+.send-btn:active { transform: scale(0.92); }
+.send-btn svg { fill: #fff; }
+.send-btn.disabled { opacity: 0.25; cursor: default; }
+
+/* ============================================================
+   SCREEN 3: SETTINGS (slide-up sheet)
+   ============================================================ */
+.settings-sheet {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--surface); border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--border);
+  padding: 12px 20px 34px; z-index: 10;
+  transform: translateY(0); transition: transform 0.3s ease;
+}
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: #333; margin: 0 auto 16px;
+}
+.sheet-title {
+  font-size: 17px; font-weight: 700; color: var(--text);
+  margin-bottom: 18px;
+}
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0; border-bottom: 1px solid var(--border);
+}
+.setting-left { display: flex; flex-direction: column; }
+.setting-label { font-size: 14px; color: var(--text); font-weight: 500; }
+.setting-desc { font-size: 11px; color: #444; margin-top: 2px; }
+.setting-value { font-size: 13px; color: var(--accent); font-weight: 500; }
+.toggle {
+  width: 44px; height: 26px; border-radius: 13px;
+  background: var(--accent); position: relative; cursor: pointer;
+}
+.toggle::after {
+  content: ''; position: absolute; top: 3px; left: 22px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; transition: left 0.2s;
+}
+.toggle.off { background: #333; }
+.toggle.off::after { left: 3px; }
+
+/* === LABEL === */
+.label {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; color: #444; font-weight: 600;
+  background: #181818; padding: 3px 12px; border-radius: 6px;
+  white-space: nowrap; z-index: 20;
+}
+</style>
+</head>
+<body>
+
+<!-- ============ PHONE 1: SETUP ============ -->
+<div class="phone" style="position: relative;">
+  <div class="label">1 · Setup API Key</div>
+  <div class="status-bar"><span>9:41</span><span>⚡ 87%</span></div>
+  <div class="setup-screen">
+    <div class="setup-logo">L</div>
+    <div class="setup-title">Lumen</div>
+    <div class="setup-sub">Masukin API key, langsung ngobrol.</div>
+
+    <div class="setup-field">
+      <label class="setup-label">PROVIDER</label>
+      <select class="setup-select" style="width:100%">
+        <option>OpenCode Go</option>
+        <option>OpenAI</option>
+        <option>Anthropic</option>
+        <option>Ollama (Local)</option>
+        <option>Custom...</option>
+      </select>
+    </div>
+
+    <div class="setup-field">
+      <label class="setup-label">API KEY</label>
+      <input class="setup-input" type="password" placeholder="sk-..." value="ocg-xxxx••••••••••" />
+      <div class="setup-hint">Disimpan lokal di device, nggak dikirim ke mana-mana.</div>
+    </div>
+
+    <button class="setup-btn">Mulai Chat →</button>
+
+    <div class="setup-divider">atau</div>
+
+    <div class="setup-presets">
+      <button class="preset-btn">
+        <div class="preset-left">
+          <div class="preset-icon" style="background:#6366f1;">O</div>
+          <div>
+            <div class="preset-name">OpenCode Go</div>
+            <div class="preset-desc">Subscription $5/bln, model lengkap</div>
+          </div>
+        </div>
+        <span class="preset-arrow">›</span>
+      </button>
+      <button class="preset-btn">
+        <div class="preset-left">
+          <div class="preset-icon" style="background:#10a37f;">G</div>
+          <div>
+            <div class="preset-name">Ollama</div>
+            <div class="preset-desc">Jalankan model lokal, gratis</div>
+          </div>
+        </div>
+        <span class="preset-arrow">›</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PHONE 2: EMPTY CHAT ============ -->
+<div class="phone" style="position: relative;">
+  <div class="label">2 · Chat (Empty)</div>
+  <div class="status-bar"><span>9:41</span><span>⚡ 87%</span></div>
+  <div class="chat-screen">
+    <div class="chat-header">
+      <div class="left">
+        <div class="logo-sm">L</div>
+        <span class="header-model">deepseek-v4-flash</span>
+      </div>
+      <div class="header-actions">
+        <button class="h-btn">+</button>
+        <button class="h-btn">⚙</button>
+      </div>
+    </div>
+    <div class="chat-body">
+      <div class="empty-state">
+        <div class="empty-icon">💬</div>
+        <div class="empty-title">Mau ngobrol apa?</div>
+        <div class="empty-sub">Ketik di bawah buat mulai.</div>
+      </div>
+    </div>
+    <div class="composer-wrap">
+      <div class="composer">
+        <input type="text" placeholder="Tanya sesuatu..." />
+        <button class="c-btn">📎</button>
+        <button class="send-btn disabled">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PHONE 3: CHAT WITH MESSAGES ============ -->
+<div class="phone" style="position: relative;">
+  <div class="label">3 · Chat (Active)</div>
+  <div class="status-bar"><span>9:41</span><span>⚡ 87%</span></div>
+  <div class="chat-screen">
+    <div class="chat-header">
+      <div class="left">
+        <div class="logo-sm">L</div>
+        <span class="header-model">deepseek-v4-flash</span>
+      </div>
+      <div class="header-actions">
+        <button class="h-btn">+</button>
+        <button class="h-btn">⚙</button>
+      </div>
+    </div>
+    <div class="chat-body">
+      <!-- User -->
+      <div class="msg user">
+        <div class="bubble user">Buatkan fungsi Python merge sort, kasih penjelasan singkat</div>
+      </div>
+
+      <!-- AI -->
+      <div class="msg">
+        <div class="msg-avatar ai">L</div>
+        <div style="max-width:85%;">
+          <div class="bubble ai">
+            Oke, ini implementasi <code>merge_sort</code>:
+            <span class="code-block">def merge_sort(arr):
+    if len(arr) <= 1:
+        return arr
+    mid = len(arr) // 2
+    left = merge_sort(arr[:mid])
+    right = merge_sort(arr[mid:])
+    return merge(left, right)
+
+def merge(left, right):
+    result, i, j = [], 0, 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            result.append(left[i]); i += 1
+        else:
+            result.append(right[j]); j += 1
+    return result + left[i:] + right[j:]</span>
+            Array dipecah jadi 2 bagian, di-sort rekursif, lalu di-merge. Time <code>O(n log n)</code>, space <code>O(n)</code>.
+            <div class="bubble-actions">
+              <button class="b-act">📋 Copy</button>
+              <button class="b-act">🔄 Retry</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User 2 -->
+      <div class="msg user">
+        <div class="bubble user">Bikin lebih cepat dong</div>
+      </div>
+
+      <!-- AI streaming -->
+      <div class="msg">
+        <div class="msg-avatar ai">L</div>
+        <div class="bubble ai" style="border: 1px solid #4f8cff22;">
+          <div class="typing-dots">
+            <div class="t-dot"></div>
+            <div class="t-dot"></div>
+            <div class="t-dot"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Composer -->
+    <div class="composer-wrap">
+      <div class="composer">
+        <input type="text" placeholder="Tanya sesuatu..." />
+        <button class="c-btn">📎</button>
+        <button class="send-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

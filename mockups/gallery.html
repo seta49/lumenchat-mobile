@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen Mobile — 3 Mockup UI/UX</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a; color: #ededed;
+  font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
+  padding: 24px; min-height: 100vh;
+}
+h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+.subtitle { color: #666; font-size: 14px; margin-bottom: 28px; }
+.gallery {
+  display: flex; gap: 28px; flex-wrap: wrap;
+  justify-content: center;
+}
+.card {
+  width: 400px; background: #111; border-radius: 20px;
+  border: 1px solid #1a1a1a; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.card:hover { border-color: #333; }
+.card-header {
+  padding: 16px 20px; border-bottom: 1px solid #1a1a1a;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-header h2 { font-size: 16px; font-weight: 700; }
+.card-header .tag {
+  padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: 600;
+}
+.tag-a { background: #4f8cff18; color: #4f8cff; }
+.tag-b { background: #a78bfa18; color: #a78bfa; }
+.tag-c { background: #34d39918; color: #34d399; }
+.card-body { padding: 12px; }
+.card-body iframe {
+  width: 100%; height: 700px; border: none; border-radius: 12px;
+  background: #000;
+}
+.card-desc {
+  padding: 12px 20px 16px; border-top: 1px solid #1a1a1a;
+  font-size: 13px; color: #888; line-height: 1.5;
+}
+.card-desc strong { color: #bbb; }
+.card-desc ul { margin-top: 6px; padding-left: 16px; }
+.card-desc li { margin-bottom: 3px; }
+.btn-row {
+  display: flex; gap: 8px; padding: 0 20px 16px;
+}
+.view-btn {
+  padding: 8px 16px; border-radius: 10px; font-size: 13px;
+  font-weight: 600; cursor: pointer; border: 1px solid #2a2a2a;
+  background: #1a1a1a; color: #ededed; text-decoration: none;
+  transition: all 0.15s; display: inline-block;
+}
+.view-btn:hover { background: #2a2a2a; }
+</style>
+</head>
+<body>
+<h1>🎨 Lumen Mobile — UI/UX Mockups</h1>
+<p class="subtitle">3 versi desain berbeda. Klik "Fullscreen" untuk preview lebih besar.</p>
+
+<div class="gallery">
+  <!-- VERSION A -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Version A</h2>
+      <span class="tag tag-a">Minimal Zen</span>
+    </div>
+    <div class="card-body">
+      <iframe src="version-a-minimal.html" loading="lazy"></iframe>
+    </div>
+    <div class="card-desc">
+      <strong>Inspired by:</strong> iMessage + Gemini
+      <ul>
+        <li>Header super minimal — avatar, model name, 2 tombol</li>
+        <li>AI response full-width, no bubble, subtle left accent on hover</li>
+        <li>Action buttons (copy/regenerate/edit) muncul on hover</li>
+        <li>Composer floating pill, clean tanpa chip reasoning</li>
+        <li>Paling sedikit chrome — fokus ke konten</li>
+      </ul>
+    </div>
+    <div class="btn-row">
+      <a class="view-btn" href="version-a-minimal.html" target="_blank">↗ Fullscreen</a>
+    </div>
+  </div>
+
+  <!-- VERSION B -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Version B</h2>
+      <span class="tag tag-b">Card Tabs</span>
+    </div>
+    <div class="card-body">
+      <iframe src="version-b-cards-tabs.html" loading="lazy"></iframe>
+    </div>
+    <div class="card-desc">
+      <strong>Inspired by:</strong> Claude + Perplexity
+      <ul>
+        <li>Bottom tab bar (Chat/Explore/Quick/Settings)</li>
+        <li>Horizontal model chip strip — switch model cepat</li>
+        <li>AI response dalam card dengan header (avatar + stats) & footer (actions)</li>
+        <li>Quick suggestion chips di bawah AI response</li>
+        <li>Composer dengan meta info (reasoning + model)</li>
+      </ul>
+    </div>
+    <div class="btn-row">
+      <a class="view-btn" href="version-b-cards-tabs.html" target="_blank">↗ Fullscreen</a>
+    </div>
+  </div>
+
+  <!-- VERSION C -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Version C</h2>
+      <span class="tag tag-c">Telegram Flow</span>
+    </div>
+    <div class="card-body">
+      <iframe src="version-c-telegram-flow.html" loading="lazy"></iframe>
+    </div>
+    <div class="card-desc">
+      <strong>Inspired by:</strong> Telegram + Discord
+      <ul>
+        <li>Header ala Telegram — nama + status (model + online indicator)</li>
+        <li>Chat bubbles: user = biru gelap, AI = abu gelap dengan avatar</li>
+        <li>Timestamp + read receipts per message</li>
+        <li>Inline action bar (copy/retry/edit/delete) di bawah AI bubble</li>
+        <li>Composer dengan emoji button + model/reasoning badges</li>
+        <li>Typing indicator animasi (3 bouncing dots)</li>
+      </ul>
+    </div>
+    <div class="btn-row">
+      <a class="view-btn" href="version-c-telegram-flow.html" target="_blank">↗ Fullscreen</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

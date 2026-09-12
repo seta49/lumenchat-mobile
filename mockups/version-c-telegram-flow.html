@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Version C — Telegram Flow</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+
+.phone {
+  width: 375px; height: 812px; background: #000; border-radius: 40px;
+  overflow: hidden; position: relative; border: 3px solid #222;
+  display: flex; flex-direction: column;
+}
+
+/* STATUS BAR */
+.status-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 24px 0; font-size: 12px; color: #999; font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* HEADER — Telegram style */
+.header {
+  display: flex; align-items: center; padding: 8px 12px;
+  background: #0d0d0d; border-bottom: 1px solid #1a1a1a; flex-shrink: 0;
+}
+.back-btn {
+  width: 36px; height: 36px; display: flex; align-items: center;
+  justify-content: center; border: none; background: transparent;
+  color: #4f8cff; cursor: pointer; font-size: 20px; border-radius: 50%;
+}
+.header-center { flex: 1; text-align: center; }
+.header-center .name { font-size: 16px; font-weight: 700; color: #ededed; }
+.header-center .status {
+  font-size: 11px; color: #4f8cff; display: flex;
+  align-items: center; justify-content: center; gap: 4px;
+}
+.header-center .status .online-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #34d399;
+}
+.hdr-right {
+  display: flex; gap: 2px;
+}
+.hdr-icon {
+  width: 36px; height: 36px; display: flex; align-items: center;
+  justify-content: center; border: none; background: transparent;
+  color: #999; cursor: pointer; font-size: 17px; border-radius: 50%;
+}
+
+/* DATE SEPARATOR */
+.date-sep {
+  text-align: center; padding: 12px 0 8px;
+}
+.date-sep span {
+  font-size: 12px; color: #555; background: #0d0d0d;
+  padding: 4px 12px; border-radius: 10px;
+}
+
+/* CHAT AREA */
+.chat-area {
+  flex: 1; overflow-y: auto; padding: 4px 12px 110px;
+  display: flex; flex-direction: column;
+}
+.chat-area::-webkit-scrollbar { width: 0; }
+
+/* MESSAGE ROW */
+.msg-row {
+  display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-end;
+}
+.msg-row.user { flex-direction: row-reverse; }
+
+/* AI AVATAR */
+.msg-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #4f8cff, #6366f1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: #fff;
+  flex-shrink: 0; margin-bottom: 18px;
+}
+
+/* BUBBLE */
+.bubble-wrap { max-width: 82%; }
+.bubble {
+  padding: 8px 12px; border-radius: 16px; position: relative;
+  font-size: 15px; line-height: 1.5;
+}
+.bubble.ai {
+  background: #141414; color: #d4d4d4;
+  border-radius: 4px 16px 16px 16px;
+}
+.bubble.user {
+  background: #1a2744; color: #ededed;
+  border-radius: 16px 16px 4px 16px;
+}
+.bubble code {
+  background: #1a1a1a; padding: 1px 5px; border-radius: 4px;
+  font-family: 'SF Mono', monospace; font-size: 13px; color: #a78bfa;
+}
+.bubble .code-block {
+  display: block; background: #0a0a0a; border-radius: 8px;
+  padding: 10px 12px; margin: 8px -4px; font-size: 13px;
+  border: 1px solid #1a1a1a; overflow-x: auto; white-space: pre;
+  font-family: 'SF Mono', monospace; color: #d4d4d4;
+}
+
+/* META — time + status */
+.msg-meta {
+  display: flex; align-items: center; gap: 4px;
+  margin-top: 2px; padding: 0 4px;
+}
+.msg-row:not(.user) .msg-meta { justify-content: flex-start; }
+.msg-row.user .msg-meta { justify-content: flex-end; }
+.msg-time { font-size: 11px; color: #444; }
+.msg-status { font-size: 11px; color: #4f8cff; }
+
+/* INLINE ACTION BAR — always visible below AI msgs */
+.action-bar {
+  display: flex; gap: 1px; margin-top: 4px;
+  opacity: 0; transition: opacity 0.15s;
+}
+.msg-row:not(.user):hover .action-bar,
+.action-bar.show { opacity: 1; }
+.act-btn {
+  padding: 3px 8px; border-radius: 6px; font-size: 11px;
+  background: transparent; border: none; cursor: pointer;
+  color: #555; display: flex; align-items: center; gap: 3px;
+  transition: all 0.12s;
+}
+.act-btn:hover { background: #1a1a1a; color: #999; }
+
+/* STREAMING */
+.typing-indicator {
+  display: flex; gap: 4px; padding: 4px 0;
+}
+.typing-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #4f8cff;
+  animation: blink 1.2s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,60%,100% { opacity: 0.3; } 30% { opacity: 1; } }
+
+/* COMPOSER */
+.composer-area {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 0 8px 28px;
+  background: linear-gradient(transparent 0%, #000 25%);
+}
+.composer-attach {
+  display: flex; gap: 6px; padding: 0 8px 6px;
+}
+.attach-chip {
+  padding: 4px 10px; border-radius: 10px; font-size: 11px;
+  background: #141414; border: 1px solid #222; color: #666;
+  display: flex; align-items: center; gap: 4px;
+}
+.composer-main {
+  display: flex; align-items: flex-end; gap: 6px;
+}
+.composer-bubble {
+  flex: 1; background: #111; border: 1px solid #222;
+  border-radius: 20px; padding: 4px 4px 4px 14px;
+  display: flex; align-items: flex-end; gap: 4px;
+}
+.composer-bubble input {
+  flex: 1; background: none; border: none; outline: none;
+  color: #ededed; font-size: 15px; padding: 10px 0;
+}
+.composer-bubble input::placeholder { color: #444; }
+.c-icon-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: transparent; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #555; font-size: 16px; flex-shrink: 0;
+}
+.c-icon-btn:hover { color: #999; }
+.send-round {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: #4f8cff; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: transform 0.1s;
+}
+.send-round:active { transform: scale(0.9); }
+.send-round svg { fill: #fff; }
+.composer-bottom {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 8px 0;
+}
+.model-badge {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 8px;
+  background: #141414; border: 1px solid #222; cursor: pointer;
+}
+.model-badge .dot {
+  width: 5px; height: 5px; border-radius: 50%; background: #34d399;
+}
+.model-badge span { font-size: 11px; color: #666; }
+.reasoning-badge {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 8px;
+  background: #141414; border: 1px solid #222; cursor: pointer;
+}
+.reasoning-badge span { font-size: 11px; color: #555; }
+
+/* SCROLLBAR */
+.chat-area::-webkit-scrollbar { width: 0; }
+
+/* DATE DIVIDER */
+.divider {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 0 8px;
+}
+.divider::before, .divider::after {
+  content: ''; flex: 1; height: 1px; background: #1a1a1a;
+}
+.divider span { font-size: 11px; color: #444; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="status-bar"><span>9:41</span><span>⚡ 87%</span></div>
+
+  <!-- Header -->
+  <div class="header">
+    <button class="back-btn">‹</button>
+    <div class="header-center">
+      <div class="name">Lumen</div>
+      <div class="status">
+        <span class="online-dot"></span>
+        <span>deepseek-v4-flash</span>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <button class="hdr-icon">🔍</button>
+      <button class="hdr-icon">⋯</button>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div class="chat-area">
+    <div class="divider"><span>Hari ini</span></div>
+
+    <!-- AI greeting -->
+    <div class="msg-row">
+      <div class="msg-avatar">L</div>
+      <div class="bubble-wrap">
+        <div class="bubble ai">Halo Atha! Ada yang bisa aku bantu hari ini? ✨</div>
+        <div class="msg-meta"><span class="msg-time">09:12</span></div>
+      </div>
+    </div>
+
+    <!-- User -->
+    <div class="msg-row user">
+      <div class="bubble-wrap">
+        <div class="bubble user">Buatkan fungsi Python merge sort dong</div>
+        <div class="msg-meta"><span class="msg-time">09:13</span><span class="msg-status">✓✓</span></div>
+      </div>
+    </div>
+
+    <!-- AI response -->
+    <div class="msg-row">
+      <div class="msg-avatar">L</div>
+      <div class="bubble-wrap">
+        <div class="bubble ai">
+          Oke, ini implementasi <code>merge sort</code>:
+          <span class="code-block">def merge_sort(arr):
+    if len(arr) <= 1:
+        return arr
+    mid = len(arr) // 2
+    left = merge_sort(arr[:mid])
+    right = merge_sort(arr[mid:])
+    return merge(left, right)</span>
+          Time complexity: <code>O(n log n)</code> di semua kasus. Space <code>O(n)</code> untuk temporary array.
+        </div>
+        <div class="action-bar show">
+          <button class="act-btn">📋 Copy</button>
+          <button class="act-btn">🔄 Retry</button>
+          <button class="act-btn">✏️ Edit</button>
+          <button class="act-btn">🗑️</button>
+        </div>
+        <div class="msg-meta"><span class="msg-time">09:13</span></div>
+      </div>
+    </div>
+
+    <!-- User -->
+    <div class="msg-row user">
+      <div class="bubble-wrap">
+        <div class="bubble user">Optimasi dong biar lebih cepat</div>
+        <div class="msg-meta"><span class="msg-time">09:14</span><span class="msg-status">✓✓</span></div>
+      </div>
+    </div>
+
+    <!-- Streaming AI -->
+    <div class="msg-row">
+      <div class="msg-avatar">L</div>
+      <div class="bubble-wrap">
+        <div class="bubble ai" style="border: 1px solid #4f8cff22;">
+          Bisa dioptimasi dengan beberapa pendekatan...
+          <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Composer -->
+  <div class="composer-area">
+    <div class="composer-main">
+      <div class="composer-bubble">
+        <input type="text" placeholder="Pesan..." />
+        <button class="c-icon-btn">📎</button>
+        <button class="c-icon-btn">😊</button>
+      </div>
+      <button class="send-round">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+    <div class="composer-bottom">
+      <div class="model-badge"><span class="dot"></span><span>deepseek-v4-flash</span></div>
+      <div class="reasoning-badge"><span>✨ Off</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -15,8 +15,10 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 import { useEffect } from "react";
 import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import * as SystemUI from "expo-system-ui";
 import { I18nProvider } from "../i18n";
 import { StoreProvider, useStore } from "../store";
 import { ThemeProvider, useTheme } from "../theme";
@@ -41,6 +43,11 @@ function ThemedRoot() {
       applyLumenFonts();
     }
   }, [fontsLoaded, fontError]);
+
+  // Set system UI background color to match theme, eliminating white bars at top/bottom
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(c.bg).catch(() => {});
+  }, [c.bg]);
 
   if (!ready || (!fontsLoaded && !fontError)) {
     return <View style={{ flex: 1, backgroundColor: c.bg }} />;
@@ -72,6 +79,7 @@ function Root() {
 
 export default function RootLayout() {
   return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "transparent" }}>
     <SafeAreaProvider>
       <KeyboardProvider>
         <StoreProvider>
@@ -79,5 +87,6 @@ export default function RootLayout() {
         </StoreProvider>
       </KeyboardProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

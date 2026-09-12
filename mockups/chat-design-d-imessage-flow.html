@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Design D — iMessage Bubble Flow</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+
+.phone {
+  width: 375px; height: 812px; background: #000; border-radius: 40px;
+  overflow: hidden; position: relative; border: 3px solid #1a1a1a;
+  box-shadow: 0 0 60px rgba(0,0,0,0.8);
+  display: flex; flex-direction: column;
+}
+
+/* STATUS BAR */
+.status-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 24px 0; font-size: 12px; color: #666; font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* HEADER — iMessage-style minimal */
+.header {
+  display: flex; align-items: center; justify-content: center;
+  padding: 14px 16px 10px; flex-shrink: 0; position: relative;
+}
+.header-back {
+  position: absolute; left: 16px; color: #4f8cff; font-size: 14px;
+  font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 2px;
+}
+.header-title-wrap { text-align: center; }
+.header-title { font-size: 16px; font-weight: 700; color: #ededed; }
+.header-subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+.header-actions-right {
+  position: absolute; right: 16px; display: flex; gap: 12px;
+}
+.hdr-icon { color: #4f8cff; font-size: 17px; cursor: pointer; }
+
+/* CHAT AREA — bubble flow like iMessage */
+.chat-area {
+  flex: 1; overflow-y: auto; padding: 8px 12px 120px;
+  display: flex; flex-direction: column; gap: 4px;
+  scrollbar-width: none;
+}
+.chat-area::-webkit-scrollbar { display: none; }
+
+/* DATE HEADER */
+.date-header {
+  text-align: center; font-size: 11px; color: #555;
+  font-weight: 600; padding: 12px 0 6px;
+}
+
+/* USER BUBBLE — iMessage blue */
+.msg-user { display: flex; justify-content: flex-end; margin: 1px 0; }
+.bubble-blue {
+  max-width: 70%; padding: 9px 14px; border-radius: 18px 18px 2px 18px;
+  background: #0a84ff; color: #fff; font-size: 15px; line-height: 1.38;
+}
+
+/* AI BUBBLE — iMessage gray */
+.msg-ai { display: flex; justify-content: flex-start; margin: 1px 0; }
+.bubble-gray {
+  max-width: 82%; padding: 9px 14px; border-radius: 18px 18px 18px 2px;
+  background: #262628; color: #ededed; font-size: 15px; line-height: 1.45;
+}
+
+/* CODE inside bubble */
+.bubble-code {
+  background: #1c1c1e; border-radius: 10px; padding: 10px 12px;
+  margin: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+  color: #a5d6ff; line-height: 1.5; overflow-x: auto;
+  border: 1px solid #333;
+}
+.bubble-code .kw { color: #ff7ab2; }
+.bubble-code .str { color: #ff8170; }
+.bubble-code .cmt { color: #6c7986; }
+.bubble-code .fn { color: #67b7a4; }
+
+/* LINK inside bubble */
+.link-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(79,140,255,0.12); border-radius: 8px;
+  padding: 4px 10px; margin: 6px 0; font-size: 12px; color: #4f8cff;
+  cursor: pointer;
+}
+
+/* IMAGE bubble */
+.bubble-image {
+  width: 200px; height: 150px; border-radius: 16px;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid #333; margin: 4px 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #444; font-size: 12px;
+}
+
+/* TYPING — iOS style three dots */
+.typing-bubble-ios {
+  background: #262628; border-radius: 18px 18px 18px 2px;
+  padding: 12px 18px; display: inline-flex; gap: 3px; align-items: center;
+  margin: 1px 0;
+}
+.ios-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #666;
+  animation: iosBounce 1.4s infinite ease-in-out;
+}
+.ios-dot:nth-child(2) { animation-delay: 0.2s; }
+.ios-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes iosBounce {
+  0%,60%,100% { transform: translateY(0); opacity: 0.3; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* TIME STAMPS */
+.msg-time {
+  font-size: 10px; color: #444; text-align: right; padding: 2px 4px 0;
+}
+.msg-time.left { text-align: left; }
+
+/* READ RECEIPT */
+.read-receipt { font-size: 10px; color: #4f8cff; }
+
+/* COMPOSER — iMessage style */
+.composer-wrap {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 8px 10px 28px;
+  background: #000; border-top: 1px solid #1a1a1a;
+}
+.composer-imsg {
+  display: flex; align-items: flex-end; gap: 8px;
+}
+.composer-imsg .imsg-input-wrap {
+  flex: 1; background: #1c1c1e; border: 1px solid #333;
+  border-radius: 20px; padding: 8px 14px; display: flex; align-items: center;
+}
+.composer-imsg input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: #ededed; font-size: 15px;
+}
+.composer-imsg input::placeholder { color: #555; }
+.imsg-icon {
+  color: #666; font-size: 18px; cursor: pointer; padding: 0 4px;
+}
+.send-imsg {
+  width: 32px; height: 32px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center;
+  background: #0a84ff; border: none; color: #fff; font-size: 15px;
+  cursor: pointer; flex-shrink: 0;
+}
+
+/* QUICK ACTIONS BAR */
+.quick-bar {
+  display: flex; gap: 6px; padding: 6px 0 0; overflow-x: auto;
+}
+.quick-bar::-webkit-scrollbar { display: none; }
+.quick-chip {
+  display: flex; align-items: center; gap: 4px;
+  background: #1c1c1e; border: 1px solid #333; border-radius: 14px;
+  padding: 5px 12px; font-size: 11px; color: #888; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
+}
+.quick-chip:hover { background: #262628; color: #aaa; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="status-bar">
+    <span>9:41</span>
+    <div style="display:flex;gap:6px;align-items:center">●●● ▌ 🔋</div>
+  </div>
+
+  <div class="header">
+    <span class="header-back">‹ Edit</span>
+    <div class="header-title-wrap">
+      <div class="header-title">Lumen</div>
+      <div class="header-subtitle">deepseek-v4-flash · Thinking: On</div>
+    </div>
+    <div class="header-actions-right">
+      <span class="hdr-icon">📹</span>
+      <span class="hdr-icon">ℹ</span>
+    </div>
+  </div>
+
+  <div class="chat-area">
+    <div class="date-header">Rabu, 11 Desember</div>
+
+    <div class="msg-user">
+      <div class="bubble-blue">Hey Lumen! Aku lagi belajar React Native, gimana cara bikin animasi smooth?</div>
+    </div>
+    <div class="msg-time"><span class="read-receipt">Dibaca</span> 10:30</div>
+
+    <div class="msg-ai">
+      <div class="bubble-gray">
+        Hai! 👋 Untuk animasi di React Native, ada beberapa opsi:
+        <br><br>
+        1. <b>Animated API</b> — bawaan RN, cocok untuk animasi sederhana<br>
+        2. <b>Reanimated</b> — performa tinggi, berjalan di UI thread<br>
+        3. <b>LayoutAnimation</b> — untuk perubahan layout otomatis
+        <br><br>
+        Kalau mau yang paling powerful, pakai <b>react-native-reanimated</b>. Mau lihat contohnya?
+      </div>
+    </div>
+    <div class="msg-time left">10:31</div>
+
+    <div class="msg-user">
+      <div class="bubble-blue">Ya! Kasih contoh Reanimated dong, bikin tombol yang scale-up kalau ditekan 🤩</div>
+    </div>
+    <div class="msg-time"><span class="read-receipt">Dibaca</span> 10:32</div>
+
+    <div class="msg-ai">
+      <div class="bubble-gray">
+        Oke! Ini contoh tombol dengan scale animation pakai Reanimated:
+        <div class="bubble-code">
+<span class="kw">import</span> Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  <span class="fn">withSpring</span>,
+} <span class="kw">from</span> <span class="str">'react-native-reanimated'</span>;
+<span class="kw">import</span> { Pressable } <span class="kw">from</span> <span class="str">'react-native'</span>;
+
+<span class="kw">function</span> <span class="fn">ScaleButton</span>({ children }) {
+  <span class="kw">const</span> scale = <span class="fn">useSharedValue</span>(<span class="num">1</span>);
+
+  <span class="kw">const</span> style = <span class="fn">useAnimatedStyle</span>(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  <span class="kw">return</span> (
+    &lt;Pressable
+      onPressIn={() => (scale.value = <span class="fn">withSpring</span>(<span class="num">0.92</span>))}
+      onPressOut={() => (scale.value = <span class="fn">withSpring</span>(<span class="num">1</span>))}
+    &gt;
+      &lt;Animated.View style={style}&gt;
+        {children}
+      &lt;/Animated.View&gt;
+    &lt;/Pressable&gt;
+  );
+}
+        </div>
+        Efeknya: tombol mengecil ke 92% saat ditekan, lalu spring kembali ke 100% saat dilepas. Animasinya berjalan di UI thread jadi 60fps smooth! ✨
+        <div class="link-pill">📖 react-native-reanimated docs</div>
+      </div>
+    </div>
+    <div class="msg-time left">10:33</div>
+
+    <div class="msg-user">
+      <div class="bubble-image">📷 Screenshot Error</div>
+    </div>
+    <div class="msg-user">
+      <div class="bubble-blue">Aku dapat error ini pas install Reanimated, gimana fix-nya?</div>
+    </div>
+    <div class="msg-time"><span class="read-receipt">Dibaca</span> 10:34</div>
+
+    <div class="msg-ai">
+      <div class="typing-bubble-ios">
+        <div class="ios-dot"></div>
+        <div class="ios-dot"></div>
+        <div class="ios-dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="composer-wrap">
+    <div class="composer-imsg">
+      <div class="imsg-input-wrap">
+        <span class="imsg-icon">＋</span>
+        <input type="text" placeholder="Pesan" />
+      </div>
+      <button class="send-imsg">↑</button>
+    </div>
+    <div class="quick-bar">
+      <span class="quick-chip">✦ Thinking On</span>
+      <span class="quick-chip">🔄 Regenerate</span>
+      <span class="quick-chip">📋 Copy all</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen — Semua Layar</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#000;--surface:#0d0d0d;--card:#141414;--border:#1f1f1f;--text:#ededed;--muted:#666;--accent:#4f8cff;--input:#111}
+body{background:#0a0a0a;font-family:-apple-system,'SF Pro Display','Inter',system-ui,sans-serif;padding:32px 24px;color:#ededed}
+h1{font-size:26px;font-weight:700;margin-bottom:4px}
+.sub{color:#555;font-size:14px;margin-bottom:32px}
+.grid{display:flex;flex-wrap:wrap;gap:28px;justify-content:center}
+.phone-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.phone-label{font-size:12px;font-weight:700;color:#555;background:#161616;padding:5px 14px;border-radius:8px;letter-spacing:0.3px}
+.phone{
+  width:340px;height:740px;background:var(--bg);
+  border-radius:36px;overflow:hidden;position:relative;
+  border:2.5px solid #222;display:flex;flex-direction:column;
+  box-shadow:0 0 60px rgba(0,0,0,0.4);flex-shrink:0;
+}
+
+/* STATUS BAR */
+.sb{display:flex;justify-content:space-between;align-items:center;padding:10px 22px 0;font-size:11px;color:#555;font-weight:600;flex-shrink:0}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;flex-shrink:0;position:relative;z-index:10}
+.hdr .l{display:flex;align-items:center;gap:8px}
+.logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#4f8cff,#6366f1);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
+.hdr .r{display:flex;gap:1px}
+.hb{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:0 0;border:none;cursor:pointer;color:#555;font-size:15px}
+.hb:hover{background:var(--card);color:#999}
+
+/* MODEL CHIP */
+.mchip{display:flex;align-items:center;gap:5px;padding:4px 9px 4px 7px;border-radius:9px;background:var(--card);border:1px solid var(--border);cursor:pointer;position:relative}
+.mchip:hover{border-color:#333}
+.mchip .d{width:5px;height:5px;border-radius:50%;background:#34d399}
+.mchip .n{font-size:12px;color:var(--text);font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mchip .c{font-size:9px;color:#444}
+
+/* DROPDOWN */
+.mdrop{position:absolute;top:100%;left:0;margin-top:5px;width:280px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,0.6);overflow:hidden;z-index:100;animation:dIn .15s ease}
+@keyframes dIn{from{opacity:0;transform:scale(.96) translateY(-3px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.dsrch{padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+.dsrch input{flex:1;background:0 0;border:none;outline:0;color:var(--text);font-size:12px}
+.dsrch input::placeholder{color:#333}
+.dsrch .si{color:#333;font-size:12px}
+.dlbl{font-size:9px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:.4px;padding:8px 12px 3px}
+.dlst{max-height:240px;overflow-y:auto;padding:0 5px 5px}
+.dlst::-webkit-scrollbar{width:3px}.dlst::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+.mi{display:flex;align-items:center;justify-content:space-between;padding:8px 8px;border-radius:9px;cursor:pointer;transition:background .1s}
+.mi:hover{background:var(--card)}.mi.a{background:#4f8cff10}
+.mi .inf{display:flex;flex-direction:column}
+.mi .iid{font-size:12px;color:var(--text);font-weight:500}
+.mi .im{font-size:9px;color:#444}
+.mi .ck{width:16px;height:16px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;opacity:0;transition:opacity .15s}
+.mi.a .ck{opacity:1}
+.dfoot{padding:7px 12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.dfoot .ref{font-size:10px;color:var(--accent);cursor:pointer;background:0 0;border:none;font-weight:600}
+.dfoot .ht{font-size:9px;color:#333}
+
+/* BACKDROP */
+.bk{position:absolute;inset:0;z-index:5;background:rgba(0,0,0,0.3)}
+
+/* CHAT */
+.chat{flex:1;display:flex;flex-direction:column}
+.cbody{flex:1;overflow-y:auto;padding:6px 12px 100px;display:flex;flex-direction:column}
+.cbody::-webkit-scrollbar{width:0}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:60px}
+.eico{width:42px;height:42px;border-radius:14px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:18px}
+.etit{font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px}
+.esub{font-size:12px;color:#444}
+
+/* MESSAGES */
+.msg{display:flex;gap:6px;align-items:flex-end;margin-bottom:2px}
+.msg.u{flex-direction:row-reverse}
+.mav{width:22px;height:22px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff}
+.mav.ai{background:linear-gradient(135deg,#4f8cff,#6366f1)}
+.bb{max-width:85%;padding:8px 12px;font-size:13.5px;line-height:1.5}
+.bb.ai{background:var(--card);color:#d4d4d4;border-radius:3px 16px 16px 16px}
+.bb.u{background:#1a2744;color:var(--text);border-radius:16px 16px 3px 16px;font-size:13.5px}
+.bb code{background:#1a1a1a;padding:1px 5px;border-radius:4px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;color:#a78bfa}
+.bb .cb{display:block;background:#0a0a0a;border-radius:8px;padding:10px 12px;margin:8px -2px;font-size:12px;border:1px solid var(--border);overflow-x:auto;white-space:pre;font-family:'SF Mono','Fira Code',monospace;color:#d4d4d4;line-height:1.45}
+.bba{display:flex;gap:1px;margin-top:6px;opacity:0;transition:opacity .15s}
+.msg:hover .bba{opacity:1}
+.bab{padding:3px 8px;border-radius:7px;font-size:10px;background:0 0;border:1px solid var(--border);cursor:pointer;color:#555;display:flex;align-items:center;gap:3px;transition:all .12s}
+.bab:hover{background:var(--card);color:#999}
+.tdots{display:flex;gap:3px;padding:3px 0}
+.td{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:bl 1.2s infinite}
+.td:nth-child(2){animation-delay:.2s}.td:nth-child(3){animation-delay:.4s}
+@keyframes bl{0%,60%,100%{opacity:.2}30%{opacity:1}}
+
+/* COMPOSER */
+.cwrap{position:absolute;bottom:0;left:0;right:0;padding:0 10px 24px;background:linear-gradient(transparent 0%,var(--bg) 30%)}
+.cmp{display:flex;align-items:flex-end;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:22px;padding:5px 5px 5px 14px}
+.cmp input{flex:1;background:0 0;border:none;outline:0;color:var(--text);font-size:14px;padding:9px 0}
+.cmp input::placeholder{color:#333}
+.cb{width:32px;height:32px;border-radius:50%;background:0 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#444;font-size:15px;flex-shrink:0}
+.sb2{width:34px;height:34px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb2.dis{opacity:.25}.sb2 svg{fill:#fff}
+
+/* ALERT */
+.aov{position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:20px}
+.abox{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px 20px 20px;width:100%;max-width:300px}
+.aico{width:42px;height:42px;border-radius:12px;background:#4f8cff15;border:1px solid #4f8cff33;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:14px}
+.atit{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px}
+.ades{font-size:12px;color:#888;line-height:1.5;margin-bottom:16px}
+.afld{margin-bottom:10px}
+.albl{font-size:10px;color:var(--muted);margin-bottom:4px;display:block;font-weight:600;letter-spacing:.2px}
+.ainp{width:100%;padding:10px 12px;border-radius:11px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:13px;outline:0}
+.ainp:focus{border-color:var(--accent)}.ainp::placeholder{color:#2a2a2a}
+.asel{width:100%;padding:10px 12px;border-radius:11px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:13px;outline:0;-webkit-appearance:none;cursor:pointer}
+.aht{font-size:9px;color:#333;margin-top:3px}
+.abtns{display:flex;gap:7px;margin-top:4px}
+.abp{flex:1;padding:11px;border-radius:11px;background:var(--accent);border:none;cursor:pointer;color:#fff;font-size:13px;font-weight:700}
+.abg{padding:11px 14px;border-radius:11px;background:0 0;border:1px solid var(--border);color:var(--muted);font-size:13px;cursor:pointer}
+
+/* SIDEBAR */
+.sov{position:absolute;inset:0;z-index:30;display:flex}
+.sback{flex:1;background:rgba(0,0,0,0.55)}
+.spanel{width:82%;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;padding-top:10px}
+.sp-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 14px 10px}
+.sp-hdr .logo-t{font-size:17px;font-weight:700;color:var(--text)}
+.sp-hdr .cls{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:0 0;border:none;cursor:pointer;color:#555;font-size:16px}
+.sp-body{flex:1;padding:0 10px}
+.new-pill{display:flex;align-items:center;justify-content:center;gap:7px;border-radius:20px;padding:10px 0;background:var(--card);margin-bottom:8px;cursor:pointer;transition:background .12s}
+.new-pill:hover{background:#1a1a1a}
+.new-pill span{font-size:13px;color:var(--text);font-weight:600}
+.sp-search{display:flex;align-items:center;gap:7px;border-radius:20px;padding:8px 12px;background:var(--card);margin-bottom:12px}
+.sp-search input{flex:1;background:0 0;border:none;outline:0;color:var(--text);font-size:13px}
+.sp-search input::placeholder{color:#444}
+.sp-search .si{color:#444;font-size:13px}
+.sp-lbl{font-size:10px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:.5px;padding:0 8px;margin-bottom:4px}
+.sp-list{overflow-y:auto;flex:1}.sp-list::-webkit-scrollbar{width:0}
+.sp-item{padding:9px 10px;border-radius:12px;cursor:pointer;transition:background .1s}
+.sp-item:hover{background:var(--card)}
+.sp-item.a{background:var(--card)}
+.sp-item .tit{font-size:13px;color:var(--text);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-item.a .tit{font-weight:700}
+.sp-ftr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 12px;border-top:1px solid var(--border)}
+.sp-ftr .prof{display:flex;align-items:center;gap:8px;flex:1;cursor:pointer}
+.sp-ftr .av{width:26px;height:26px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.sp-ftr .nm{font-size:13px;color:var(--text)}
+.sp-ftr .gear{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:0 0;border:none;cursor:pointer;color:#555;font-size:15px}
+
+/* SETTINGS SHEET */
+.setov{position:absolute;inset:0;z-index:40;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end}
+.setsheet{width:100%;background:var(--surface);border-radius:18px 18px 0 0;border-top:1px solid var(--border);padding:10px 18px 28px}
+.shandle{width:34px;height:3.5px;border-radius:2px;background:#333;margin:0 auto 14px}
+.stit{font-size:16px;font-weight:700;color:var(--text);margin-bottom:14px}
+.srow{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.sl{display:flex;flex-direction:column}
+.slbl{font-size:13px;color:var(--text);font-weight:500}
+.sdesc{font-size:10px;color:#444;margin-top:1px}
+.sval{font-size:12px;color:var(--accent);font-weight:500}
+.toggle{width:40px;height:24px;border-radius:12px;background:var(--accent);position:relative;cursor:pointer}
+.toggle::after{content:'';position:absolute;top:3px;left:20px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
+.toggle.off{background:#333}.toggle.off::after{left:3px}
+.accent-dots{display:flex;gap:6px}
+.accent-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+.accent-dot.sel{border-color:var(--text)}
+</style>
+</head>
+<body>
+
+<h1>🎨 Lumen Mobile — Semua Layar</h1>
+<p class="sub">7 layar: dari setup sampai chat aktif + settings</p>
+
+<div class="grid">
+
+<!-- ============ 1: ALERT API KEY ============ -->
+<div class="phone-wrap">
+  <span class="phone-label">1 · Alert API Key</span>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+    <div class="chat">
+      <div class="hdr">
+        <div class="l"><div class="logo">L</div><span style="font-size:13px;color:var(--muted);font-weight:500">Lumen</span></div>
+        <div class="r"><button class="hb">+</button><button class="hb">⚙</button></div>
+      </div>
+      <div class="cbody"><div class="empty"><div class="eico">💬</div><div class="etit">Mau ngobrol apa?</div><div class="esub">Ketik di bawah buat mulai.</div></div></div>
+      <div class="cwrap"><div class="cmp"><input placeholder="Tanya sesuatu..." /><button class="cb">📎</button><button class="sb2 dis"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div></div>
+    </div>
+    <div class="aov">
+      <div class="abox">
+        <div class="aico">🔑</div>
+        <div class="atit">Setup API Key</div>
+        <div class="ades">Masukin API key dulu biar bisa dipake. Disimpan lokal di device.</div>
+        <div class="afld"><label class="albl">PROVIDER</label><select class="asel"><option>OpenCode Go</option><option>OpenAI</option><option>Anthropic</option><option>Ollama (Local)</option><option>Custom...</option></select></div>
+        <div class="afld"><label class="albl">API KEY</label><input class="ainp" type="password" placeholder="sk-..." /><div class="aht">Tidak dikirim ke server manapun.</div></div>
+        <div class="abtns"><button class="abg">Nanti</button><button class="abp">Simpan</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 2: EMPTY CHAT (READY) ============ -->
+<div class="phone-wrap">
+  <span class="phone-label">2 · Chat Kosong</span>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+    <div class="chat">
+      <div class="hdr">
+        <div class="l"><div class="logo">L</div><div class="mchip"><span class="d"></span><span class="n">deepseek-v4-flash</span><span class="c">▾</span></div></div>
+        <div class="r"><button class="hb">+</button><button class="hb">⚙</button></div>
+      </div>
+      <div class="cbody"><div class="empty"><div class="eico">💬</div><div class="etit">Mau ngobrol apa?</div><div class="esub">Ketik di bawah buat mulai.</div></div></div>
+      <div class="cwrap"><div class="cmp"><input placeholder="Tanya sesuatu..." /><button class="cb">📎</button><button class="sb2 dis"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 3: MODEL DROPDOWN ============ -->
+<div class="phone-wrap">
+  <span class="phone-label">3 · Model Dropdown</span>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+    <div class="bk"></div>
+    <div class="chat">
+      <div class="hdr">
+        <div class="l"><div class="logo">L</div><div class="mchip" style="border-color:#333;background:#1a1a1a"><span class="d"></span><span class="n">deepseek-v4-flash</span><span class="c" style="transform:rotate(180deg)">▾</span>
+          <div class="mdrop">
+            <div class="dsrch"><span class="si">🔍</span><input placeholder="Cari model..." /></div>
+            <div class="dlbl">Populer</div>
+            <div class="dlst">
+              <div class="mi a"><div class="inf"><span class="iid">deepseek-v4-flash</span><span class="im">DeepSeek · fast · 128K</span></div><div class="ck">✓</div></div>
+              <div class="mi"><div class="inf"><span class="iid">qwen3.7-max</span><span class="im">Alibaba · reasoning · 128K</span></div><div class="ck">✓</div></div>
+              <div class="mi"><div class="inf"><span class="iid">glm-5.3-flash</span><span class="im">Zhipu · fast · 128K</span></div><div class="ck">✓</div></div>
+              <div class="mi"><div class="inf"><span class="iid">kimi-k3</span><span class="im">Moonshot · reasoning · 128K</span></div><div class="ck">✓</div></div>
+              <div class="mi"><div class="inf"><span class="iid">omen-alpha</span><span class="im">Stealth · reasoning · 500K</span></div><div class="ck">✓</div></div>
+              <div class="mi"><div class="inf"><span class="iid">hy4-preview</span><span class="im">Zhipu · balanced · 128K</span></div><div class="ck">✓</div></div>
+            </div>
+            <div class="dfoot"><button class="ref">↻ Refresh list</button><span class="ht">36 model</span></div>
+          </div>
+        </div></div>
+        <div class="r"><button class="hb">+</button><button class="hb">⚙</button></div>
+      </div>
+      <div class="cbody"><div class="empty"><div class="eico">💬</div><div class="etit">Mau ngobrol apa?</div><div class="esub">Ketik di bawah buat mulai.</div></div></div>
+      <div class="cwrap"><div class="cmp"><input placeholder="Tanya sesuatu..." /><button class="cb">📎</button><button class="sb2 dis"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 4: CHAT AKTIF ============ -->
+<div class="phone-wrap">
+  <span class="phone-label">4 · Chat Aktif</span>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+    <div class="chat">
+      <div class="hdr">
+        <div class="l"><div class="logo">L</div><div class="mchip"><span class="d"></span><span class="n">deepseek-v4-flash</span><span class="c">▾</span></div></div>
+        <div class="r"><button class="hb">+</button><button class="hb">⚙</button></div>
+      </div>
+      <div class="cbody">
+        <div class="msg u"><div class="bb u">Buatkan fungsi Python merge sort, kasih penjelasan</div></div>
+        <div class="msg"><div class="mav ai">L</div><div style="max-width:85%"><div class="bb ai">
+          Oke, ini <code>merge_sort</code>:
+          <span class="cb">def merge_sort(arr):
+    if len(arr) <= 1:
+        return arr
+    mid = len(arr) // 2
+    left = merge_sort(arr[:mid])
+    right = merge_sort(arr[mid:])
+    return merge(left, right)
+
+def merge(left, right):
+    result, i, j = [], 0, 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            result.append(left[i]); i += 1
+        else:
+            result.append(right[j]); j += 1
+    return result + left[i:] + right[j:]</span>
+          Rekursif pecah 2, merge balik. <code>O(n log n)</code>.
+          <div class="bba"><button class="bab">📋 Copy</button><button class="bab">🔄 Retry</button></div>
+        </div></div></div>
+        <div class="msg u"><div class="bb u">Bikin lebih cepat dong</div></div>
+        <div class="msg"><div class="mav ai">L</div><div class="bb ai" style="border:1px solid #4f8cff22"><div class="tdots"><div class="td"></div><div class="td"></div><div class="td"></div></div></div></div>
+      </div>
+      <div class="cwrap"><div class="cmp"><input placeholder="Tanya sesuatu..." /><button class="cb">📎</button><button class="sb2"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 5: SIDEBAR ============ -->
+<div class="phone-wrap">
+  <span class="phone-label">5 · Sidebar Riwayat</span>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+    <div class="sov">
+      <div class="spanel">
+        <div class="sp-hdr"><span class="logo-t">Lumen</span><button class="cls">✕</button></div>
+        <div class="sp-body">
+          <div class="new-pill"><span style="font-size:14px">✏️</span><span>Chat Baru</span></div>
+          <div class="sp-search"><span class="si">🔍</span><input placeholder="Cari chat..." /></div>
+          <div class="sp-lbl">Riwayat</div>
+          <div class="sp-list">
+            <div class="sp-item a"><div class="tit">Merge sort Python</div></div>
+            <div class="sp-item"><div class="tit">Penjelasan REST API</div></div>
+            <div class="sp-item"><div class="tit">React Native vs Flutter</div></div>
+            <div class="sp-item"><div class="tit">Cara deploy ke VPS</div></div>
+            <div class="sp-item"><div class="tit">Jelaskan OOP sederhana</div></div>
+            <div class="sp-item"><div class="tit">Buatkan portfolio HTML</div></div>
+            <div class="sp-item"><div class="tit">Perbedaan SQL vs NoSQL</div></div>
+            <div class="sp-item"><div class="tit">Tips belajar coding</div></div>
+          </div>
+        </div>
+        <div class="sp-ftr">
+          <div class="prof"><div class="av">A</div><span class="nm">Atha</span></div>
+          <button class="gear">⚙</button>
+        </div>
+      </div>
+      <div class="sback"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 6: SETTINGS SHEET ============ -->
+<div class="phone-wrap">
+  <span class="phone-label">6 · Settings</span>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+    <div class="setov">
+      <div class="setsheet">
+        <div class="shandle"></div>
+        <div class="stit">Settings</div>
+        <div class="srow">
+          <div class="sl"><span class="slbl">Provider & Model</span><span class="sdesc">OpenCode Go · deepseek-v4-flash</span></div>
+          <span class="sval">Ganti ›</span>
+        </div>
+        <div class="srow">
+          <div class="sl"><span class="slbl">API Key</span><span class="sdesc">ocg-xxxx••••••••</span></div>
+          <span class="sval">Edit ›</span>
+        </div>
+        <div class="srow">
+          <div class="sl"><span class="slbl">Default Model</span><span class="sdesc">deepseek-v4-flash · Reasoning Off</span></div>
+          <span class="sval">Ganti ›</span>
+        </div>
+        <div class="srow">
+          <div class="sl"><span class="slbl">Tema</span><span class="sdesc">Dark</span></div>
+          <div class="toggle"></div>
+        </div>
+        <div class="srow">
+          <div class="sl"><span class="slbl">Accent Color</span></div>
+          <div class="accent-dots">
+            <div class="accent-dot sel" style="background:#4f8cff"></div>
+            <div class="accent-dot" style="background:#34d399"></div>
+            <div class="accent-dot" style="background:#a78bfa"></div>
+            <div class="accent-dot" style="background:#fb923c"></div>
+            <div class="accent-dot" style="background:#f472b6"></div>
+          </div>
+        </div>
+        <div class="srow" style="border-bottom:none">
+          <div class="sl"><span class="slbl">Hapus Semua Chat</span></div>
+          <span class="sval" style="color:#f87171">Hapus</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 7: CHAT + SIDEBAR OPEN ============ -->
+<div class="phone-wrap">
+  <span class="phone-label">7 · Chat + Sidebar</span>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>⚡ 87%</span></div>
+    <div class="sov" style="background:0 0">
+      <div class="spanel">
+        <div class="sp-hdr"><span class="logo-t">Lumen</span><button class="cls">✕</button></div>
+        <div class="sp-body">
+          <div class="new-pill"><span style="font-size:14px">✏️</span><span>Chat Baru</span></div>
+          <div class="sp-search"><span class="si">🔍</span><input placeholder="Cari chat..." /></div>
+          <div class="sp-lbl">Riwayat</div>
+          <div class="sp-list">
+            <div class="sp-item"><div class="tit">Merge sort Python</div></div>
+            <div class="sp-item a"><div class="tit">Penjelasan REST API</div></div>
+            <div class="sp-item"><div class="tit">React Native vs Flutter</div></div>
+            <div class="sp-item"><div class="tit">Cara deploy ke VPS</div></div>
+          </div>
+        </div>
+        <div class="sp-ftr">
+          <div class="prof"><div class="av">A</div><span class="nm">Atha</span></div>
+          <button class="gear">⚙</button>
+        </div>
+      </div>
+      <div class="sback" style="flex:1;display:flex;flex-direction:column">
+        <div class="hdr" style="opacity:0.3">
+          <div class="l"><div class="logo">L</div><div class="mchip"><span class="d"></span><span class="n">deepseek-v4-flash</span><span class="c">▾</span></div></div>
+          <div class="r"><button class="hb">+</button><button class="hb">⚙</button></div>
+        </div>
+        <div style="flex:1;padding:12px;opacity:0.2">
+          <div class="msg u"><div class="bb u" style="font-size:12px">Penjelasan REST API dong</div></div>
+          <div class="msg"><div class="bb ai" style="font-size:12px">REST API itu...</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen Chat — 5 Design Mockups</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #080808; color: #ededed;
+  font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
+  padding: 32px 24px; min-height: 100vh;
+}
+
+.hero { text-align: center; margin-bottom: 48px; }
+.hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+.hero h1 span { background: linear-gradient(135deg, #4f8cff, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero p { color: #666; font-size: 15px; line-height: 1.5; max-width: 520px; margin: 0 auto; }
+
+.gallery {
+  display: flex; gap: 28px; flex-wrap: wrap; justify-content: center;
+  max-width: 1400px; margin: 0 auto;
+}
+
+.card {
+  width: 420px; background: #111; border-radius: 20px;
+  border: 1px solid #1a1a1a; overflow: hidden;
+  transition: all 0.25s ease;
+}
+.card:hover { border-color: #333; transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+
+.card-header {
+  padding: 16px 20px; border-bottom: 1px solid #1a1a1a;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-header h2 { font-size: 16px; font-weight: 700; }
+.card-header .tag {
+  padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;
+}
+
+.card-body { padding: 12px; }
+.card-body iframe {
+  width: 100%; height: 740px; border: none; border-radius: 12px;
+  background: #000;
+}
+
+.card-desc {
+  padding: 14px 20px 18px; border-top: 1px solid #1a1a1a;
+  font-size: 13px; color: #888; line-height: 1.6;
+}
+.card-desc strong { color: #bbb; }
+.card-desc ul { margin-top: 8px; padding-left: 18px; }
+.card-desc li { margin-bottom: 4px; }
+
+.tag-a { background: #4f8cff18; color: #4f8cff; }
+.tag-b { background: #6ab3f318; color: #6ab3f3; }
+.tag-c { background: #a78bfa18; color: #a78bfa; }
+.tag-d { background: #0a84ff18; color: #0a84ff; }
+.tag-e { background: #f472b618; color: #f472b6; }
+
+.btn-row {
+  display: flex; gap: 8px; padding: 0 20px 16px;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 10px; font-size: 12px;
+  font-weight: 600; text-decoration: none; cursor: pointer;
+  border: 1px solid #2a2a2a; color: #999; background: #1a1a1a;
+  transition: all 0.15s;
+}
+.btn:hover { background: #222; color: #ccc; border-color: #333; }
+
+.footer { text-align: center; margin-top: 48px; color: #444; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>Lumen Chat — <span>5 Design Concepts</span></h1>
+  <p>Mockup desain bagian chat dengan berbagai pendekatan visual. Klik "Open Full" untuk melihat versi fullscreen di tab baru.</p>
+</div>
+
+<div class="gallery">
+
+  <!-- DESIGN A -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Design A</h2>
+      <span class="tag tag-a">Glassmorphism</span>
+    </div>
+    <div class="card-body">
+      <iframe src="chat-design-a-glassmorphism.html"></iframe>
+    </div>
+    <div class="card-desc">
+      <strong>Glassmorphism Bubbles</strong> — Efek kaca transparan dengan backdrop blur.
+      <ul>
+        <li>Bubble user & AI pakai <code>backdrop-filter: blur()</code></li>
+        <li>Gradient avatar + pulse dot status</li>
+        <li>Code block dengan syntax highlighting warna-warni</li>
+        <li>Composer pill dengan gradient send button</li>
+        <li>Thinking indicator dengan animasi dot</li>
+      </ul>
+    </div>
+    <div class="btn-row">
+      <a class="btn" href="chat-design-a-glassmorphism.html" target="_blank">↗ Open Full</a>
+    </div>
+  </div>
+
+  <!-- DESIGN B -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Design B</h2>
+      <span class="tag tag-b">Telegram Clean</span>
+    </div>
+    <div class="card-body">
+      <iframe src="chat-design-b-telegram-clean.html"></iframe>
+    </div>
+    <div class="card-desc">
+      <strong>Telegram-inspired Clean</strong> — Palet dark blue ala Telegram, bersih dan fungsional.
+      <ul>
+        <li>Warna teal-blue (#0e1621) sebagai base background</li>
+        <li>User bubble biru gelap (#2b5278), AI bubble lebih gelap</li>
+        <li>Timestamp inline di setiap bubble (ala Telegram)</li>
+        <li>Code block dengan header "Salin" dan language tag</li>
+        <li>Composer dengan ikon emoji & attach ala Telegram</li>
+      </ul>
+    </div>
+    <div class="btn-row">
+      <a class="btn" href="chat-design-b-telegram-clean.html" target="_blank">↗ Open Full</a>
+    </div>
+  </div>
+
+  <!-- DESIGN C -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Design C</h2>
+      <span class="tag tag-c">Split Cards</span>
+    </div>
+    <div class="card-body">
+      <iframe src="chat-design-c-split-cards.html"></iframe>
+    </div>
+    <div class="card-desc">
+      <strong>Split Persona Cards</strong> — User = teks biasa, AI = kartu beraksen.
+      <ul>
+        <li>User messages tanpa bubble, hanya teks rata kanan</li>
+        <li>AI messages dalam card dengan left accent stripe</li>
+        <li>Card header: avatar + nama model + label reasoning</li>
+        <li>Tabel native di dalam card untuk perbandingan</li>
+        <li>Token badge di bawah setiap respons AI</li>
+        <li>Skeleton shimmer loader saat thinking</li>
+      </ul>
+    </div>
+    <div class="btn-row">
+      <a class="btn" href="chat-design-c-split-cards.html" target="_blank">↗ Open Full</a>
+    </div>
+  </div>
+
+  <!-- DESIGN D -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Design D</h2>
+      <span class="tag tag-d">iMessage Flow</span>
+    </div>
+    <div class="card-body">
+      <iframe src="chat-design-d-imessage-flow.html"></iframe>
+    </div>
+    <div class="card-desc">
+      <strong>iMessage Bubble Flow</strong> — Familiar iOS chat experience, clean dan native.
+      <ul>
+        <li>User bubble biru terang (#0a84ff) ala iMessage</li>
+        <li>AI bubble abu gelap (#262628) seperti received messages</li>
+        <li>Read receipt "Dibaca" di bawah pesan user</li>
+        <li>Link pill clickable untuk dokumentasi</li>
+        <li>iOS-style typing indicator (3 bouncing dots)</li>
+        <li>Quick action bar di bawah composer</li>
+      </ul>
+    </div>
+    <div class="btn-row">
+      <a class="btn" href="chat-design-d-imessage-flow.html" target="_blank">↗ Open Full</a>
+    </div>
+  </div>
+
+  <!-- DESIGN E -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Design E</h2>
+      <span class="tag tag-e">Gemini Ambient</span>
+    </div>
+    <div class="card-body">
+      <iframe src="chat-design-e-gemini-ambient.html"></iframe>
+    </div>
+    <div class="card-desc">
+      <strong>Gemini Ambient</strong> — Inspirasi Google Gemini, spacious dan elegan.
+      <ul>
+        <li>Logo sparkle dengan 4 dots berputar (animated)</li>
+        <li>Model selector floating pill di atas chat</li>
+        <li>User message tanpa bubble, AI full-width typography</li>
+        <li>Section titles dengan ikon untuk organisasi konten</li>
+        <li>Code block dengan toolbar (Copy + Apply)</li>
+        <li>Gemini-style shimmer thinking indicator</li>
+        <li>Composer wide dengan bottom tools row</li>
+      </ul>
+    </div>
+    <div class="btn-row">
+      <a class="btn" href="chat-design-e-gemini-ambient.html" target="_blank">↗ Open Full</a>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Lumen Mobile v0.3.0 — Chat UI Design Exploration
+</div>
+</body>
+</html>
