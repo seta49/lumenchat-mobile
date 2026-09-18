@@ -1,43 +1,32 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useState } from "react";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
-import { useTheme } from "../theme";
+import { R, SP, useTheme } from "../theme";
+import { TXT } from "../fonts";
 import type { ChatMessage as ChatMessageType, ContentPart } from "../types/chat";
 import { imageDisplaySize } from "../utils/image";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { Button, Divider, IconButton, Meter, Row, useReducedMotion } from "./ui";
 import { Sheet } from "./Sheet";
 
-function TypingDots() {
-  const { c } = useTheme();
-  const { t } = useI18n();
-  const opacity = useRef(new Animated.Value(0.4)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 500, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [opacity]);
-  return (
-    <Animated.Text style={{ color: c.muted, opacity, fontStyle: "italic", fontSize: 14 }}>
-      {t("typing.thinking")}
-    </Animated.Text>
-  );
+function compactTokens(n: number): string {
+  if (n < 1000) {
+    return String(n);
+  }
+  return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`;
 }
 
 function ImagePart({ part }: { part: ContentPart }) {
+  const { c } = useTheme();
   const size = imageDisplaySize(part.image_url?.width, part.image_url?.height);
   return (
     <Image
       source={{ uri: part.image_url?.url }}
-      style={[styles.image, size]}
+      style={[styles.image, size, { borderColor: c.border }]}
       contentFit="cover"
       transition={120}
     />
@@ -45,27 +34,36 @@ function ImagePart({ part }: { part: ContentPart }) {
 }
 
 function plainText(content: string | ContentPart[]): string {
-  if (typeof content === "string") return content;
+  if (typeof content === "string") {
+    return content;
+  }
   return content
     .map((p) => (p.type === "text" ? p.text ?? "" : ""))
     .join("\n")
     .trim();
 }
 
-/** Bubble chat v2: tap lama = aksi (copy, regenerate/edit, hapus). */
+/**
+ * A turn in the ledger.
+ *
+ * Both speakers run full measure and are told apart by a coloured spine and a
+ * mono byline, not by a bubble. That keeps pasted code and long prompts at
+ * full width, and it gives every turn a place to put its own actions — which
+ * is what a long-press-only menu could never provide.
+ */
 export function ChatMessage({
   message,
   streaming,
-  highlight,
 }: {
   message: ChatMessageType;
   streaming: boolean;
-  highlight?: string;
 }) {
   const { c } = useTheme();
   const { t } = useI18n();
   const { regenerate, editAndResend, deleteMessage } = useStore();
+  const reduced = useReducedMotion();
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -73,9 +71,8 @@ export function ChatMessage({
   const parts = typeof message.content === "string" ? null : message.content;
   const rawText = typeof message.content === "string" ? message.content : "";
   const streamingEmpty = streaming && !rawText.trim() && !parts;
-  const matched =
-    highlight &&
-    rawText.toLowerCase().includes(highlight.toLowerCase());
+  const byline = isUser ? t("common.you") : "Lumen";
+  const spineColor = isUser || streaming ? c.accent : c.borderStrong;
 
   const copy = async () => {
     await Clipboard.setStringAsync(plainText(message.content));
@@ -92,177 +89,243 @@ export function ChatMessage({
   };
   const saveEdit = () => {
     setEditing(false);
-    if (draft.trim()) void editAndResend(message.id, draft);
+    if (draft.trim()) {
+      void editAndResend(message.id, draft);
+    }
   };
 
   return (
-    <View style={[styles.row, isUser && styles.rowUser]}>
-      <Pressable
-        onLongPress={() => !streaming && setActionsOpen(true)}
-        delayLongPress={300}
-        style={
-          isUser
-            ? [
-                styles.bubble,
-                {
-                  backgroundColor: c.bubbleUser,
-                  borderColor: matched ? c.accent : c.border,
-                  borderWidth: matched ? 1 : 0,
-                },
-              ]
-            : [
-                styles.aiBlock,
-                matched
-                  ? {
-                      borderLeftWidth: 2,
-                      borderLeftColor: c.accent,
-                      paddingLeft: 10,
-                    }
-                  : null,
-              ]
-        }
-      >
-        {parts ? (
-          parts.map((part, i) =>
-            part.type === "image_url" ? (
-              <ImagePart key={i} part={part} />
-            ) : isUser ? (
-              <Text key={i} style={[styles.userText, { color: c.text }]}>
-                {part.text ?? ""}
-              </Text>
-            ) : (
-              <MarkdownRenderer key={i} body={part.text ?? ""} />
-            ),
-          )
-        ) : streamingEmpty ? (
-          <TypingDots />
-        ) : isUser ? (
-          <Text style={[styles.userText, { color: c.text }]}>{rawText}</Text>
-        ) : (
-          <MarkdownRenderer body={rawText} />
-        )}
-      </Pressable>
+    <View style={styles.turn}>
+      <View style={[styles.spine, { backgroundColor: spineColor }]} />
 
-      {/* Aksi pesan */}
-      <Sheet visible={actionsOpen} title={t("common.edit")} onClose={() => setActionsOpen(false)}>
-        <Pressable onPress={copy} style={styles.actionRow}>
-          <Ionicons name="copy-outline" size={18} color={c.text} />
-          <Text style={{ color: c.text, fontSize: 14 }}>{t("message.copy")}</Text>
-        </Pressable>
+      <View style={styles.turnBody}>
+        <View style={styles.rail}>
+          <Text style={[TXT.label, { color: isUser ? c.accent : c.muted }]}>{byline}</Text>
+          {streaming ? <Meter active reduced={reduced} /> : null}
+          <View style={styles.railSpacer} />
+          {message.usage && !streaming ? (
+            <Text style={[TXT.label, { color: c.faint }]}>
+              {`↑${compactTokens(message.usage.prompt_tokens)}  ↓${compactTokens(message.usage.completion_tokens)}`}
+            </Text>
+          ) : null}
+          {!streaming ? (
+            <IconButton
+              icon="ellipsis-horizontal"
+              size={30}
+              onPress={() => setActionsOpen(true)}
+              label={`${t("message.actions")} — ${byline}`}
+            />
+          ) : null}
+        </View>
+
+        {message.error ? (
+          <View
+            style={[styles.error, { backgroundColor: c.raised, borderColor: c.danger }]}
+            accessibilityLiveRegion="polite"
+          >
+            <View style={styles.errorHead}>
+              <Ionicons name="alert-circle-outline" size={16} color={c.danger} />
+              <Text style={[TXT.label, { color: c.danger, flex: 1 }]}>
+                {t("errors.requestFailed")}
+              </Text>
+            </View>
+            <Text style={[TXT.small, { color: c.muted, marginTop: SP.xs }]} selectable>
+              {message.error}
+            </Text>
+            <View style={styles.errorAction}>
+              <Button
+                label={t("message.retry")}
+                icon="refresh"
+                variant="ghost"
+                onPress={() => void regenerate(message.id)}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        <View
+          accessibilityLiveRegion={streaming ? "polite" : "none"}
+          style={isUser ? [styles.userField, { backgroundColor: c.panel, borderColor: c.border }] : undefined}
+        >
+          {parts ? (
+            parts.map((part, i) =>
+              part.type === "image_url" ? (
+                <ImagePart key={i} part={part} />
+              ) : isUser ? (
+                <Text key={i} style={[TXT.body, { color: c.text }]}>
+                  {part.text ?? ""}
+                </Text>
+              ) : (
+                <MarkdownRenderer key={i} body={part.text ?? ""} />
+              ),
+            )
+          ) : streamingEmpty ? (
+            <Text style={[TXT.body, { color: c.faint }]}>{t("typing.thinking")}</Text>
+          ) : isUser ? (
+            <Text style={[TXT.body, { color: c.text }]} selectable>
+              {rawText}
+            </Text>
+          ) : (
+            <MarkdownRenderer body={rawText} />
+          )}
+        </View>
+      </View>
+
+      {/* Message actions */}
+      <Sheet
+        visible={actionsOpen}
+        kicker={t("message.actions")}
+        title={byline}
+        onClose={() => setActionsOpen(false)}
+      >
+        <Row
+          flush
+          label={t("message.copy")}
+          onPress={() => void copy()}
+          right={<Ionicons name="copy-outline" size={18} color={c.muted} />}
+        />
         {isUser ? (
-          <Pressable onPress={startEdit} style={styles.actionRow}>
-            <Ionicons name="create-outline" size={18} color={c.text} />
-            <Text style={{ color: c.text, fontSize: 14 }}>{t("message.editResend")}</Text>
-          </Pressable>
+          <Row
+            flush
+            label={t("message.editResend")}
+            onPress={startEdit}
+            right={<Ionicons name="create-outline" size={18} color={c.muted} />}
+          />
         ) : (
           <>
-            <Pressable onPress={() => doRegenerate("default")} style={styles.actionRow}>
-              <Ionicons name="refresh-outline" size={18} color={c.text} />
-              <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerate")}</Text>
-            </Pressable>
-            <Pressable onPress={() => doRegenerate("shorter")} style={styles.actionRow}>
-              <Ionicons name="contract-outline" size={18} color={c.text} />
-              <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerateShorter")}</Text>
-            </Pressable>
-            <Pressable onPress={() => doRegenerate("longer")} style={styles.actionRow}>
-              <Ionicons name="expand-outline" size={18} color={c.text} />
-              <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerateLonger")}</Text>
-            </Pressable>
-            <Pressable onPress={() => doRegenerate("casual")} style={styles.actionRow}>
-              <Ionicons name="happy-outline" size={18} color={c.text} />
-              <Text style={{ color: c.text, fontSize: 14 }}>{t("message.regenerateCasual")}</Text>
-            </Pressable>
+            <Row
+              flush
+              label={t("message.regenerate")}
+              onPress={() => doRegenerate("default")}
+              right={<Ionicons name="refresh-outline" size={18} color={c.muted} />}
+            />
+            <Row
+              flush
+              label={t("message.regenerateShorter")}
+              onPress={() => doRegenerate("shorter")}
+              right={<Ionicons name="contract-outline" size={18} color={c.muted} />}
+            />
+            <Row
+              flush
+              label={t("message.regenerateLonger")}
+              onPress={() => doRegenerate("longer")}
+              right={<Ionicons name="expand-outline" size={18} color={c.muted} />}
+            />
+            <Row
+              flush
+              label={t("message.regenerateCasual")}
+              onPress={() => doRegenerate("casual")}
+              right={<Ionicons name="happy-outline" size={18} color={c.muted} />}
+            />
           </>
         )}
-        <Pressable
+        <View style={{ marginVertical: SP.sm }}>
+          <Divider />
+        </View>
+        <Row
+          flush
+          tone="danger"
+          label={t("message.delete")}
           onPress={() => {
             setActionsOpen(false);
-            deleteMessage(message.id);
+            setConfirmDelete(true);
           }}
-          style={styles.actionRow}
-        >
-          <Ionicons name="trash-outline" size={18} color={c.danger} />
-          <Text style={{ color: c.danger, fontSize: 14 }}>{t("message.delete")}</Text>
-        </Pressable>
+          right={<Ionicons name="trash-outline" size={18} color={c.danger} />}
+        />
       </Sheet>
 
-      {/* Edit & resend */}
-      <Sheet visible={editing} title={t("message.editResend")} onClose={() => setEditing(false)}>
+      {/* Delete confirmation — deleting a message had no confirm and no undo. */}
+      <Sheet
+        visible={confirmDelete}
+        title={t("message.delete")}
+        onClose={() => setConfirmDelete(false)}
+        footer={
+          <>
+            <Button
+              label={t("common.cancel")}
+              variant="ghost"
+              onPress={() => setConfirmDelete(false)}
+            />
+            <Button
+              label={t("message.delete")}
+              variant="danger"
+              onPress={() => {
+                setConfirmDelete(false);
+                deleteMessage(message.id);
+              }}
+            />
+          </>
+        }
+      >
+        <Text style={[TXT.body, { color: c.muted }]}>{t("message.deleteConfirm")}</Text>
+      </Sheet>
+
+      {/* Edit and resend */}
+      <Sheet
+        visible={editing}
+        title={t("message.editResend")}
+        onClose={() => setEditing(false)}
+        footer={
+          <>
+            <Button label={t("common.cancel")} variant="ghost" onPress={() => setEditing(false)} />
+            <Button label={t("message.saveResend")} onPress={saveEdit} disabled={!draft.trim()} />
+          </>
+        }
+      >
         <TextInput
           value={draft}
           onChangeText={setDraft}
           multiline
           autoFocus
+          accessibilityLabel={t("message.editResend")}
           style={[
             styles.editInput,
-            { color: c.text, backgroundColor: c.input, borderColor: c.border },
+            { color: c.text, backgroundColor: c.panel, borderColor: c.border },
           ]}
         />
-        <View style={styles.editActions}>
-          <Pressable
-            onPress={() => setEditing(false)}
-            style={[styles.ghostBtn, { borderColor: c.border }]}
-          >
-            <Text style={{ color: c.muted, fontSize: 13 }}>{t("common.cancel")}</Text>
-          </Pressable>
-          <Pressable
-            onPress={saveEdit}
-            style={[styles.primaryBtn, { backgroundColor: c.accent }]}
-          >
-            <Text style={{ color: c.onAccent, fontSize: 13, fontWeight: "600" }}>
-              {t("message.saveResend")}
-            </Text>
-          </Pressable>
-        </View>
       </Sheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    marginVertical: 6,
+  turn: {
+    flexDirection: "row",
+    gap: SP.md,
+    paddingVertical: SP.md,
   },
-  rowUser: {
-    alignItems: "flex-end",
-  },
-  bubble: {
-    maxWidth: "84%",
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  userText: {
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  // Balasan AI: full-width tanpa bubble — ala ChatGPT
-  aiBlock: {
-    width: "100%",
-    paddingHorizontal: 2,
-    paddingVertical: 2,
-  },
-  image: {
-    borderRadius: 12,
-    marginVertical: 4,
-  },
-  actionRow: {
+  spine: { width: 2, borderRadius: 1 },
+  turnBody: { flex: 1, minWidth: 0 },
+  rail: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    gap: SP.sm,
+    minHeight: 30,
   },
+  railSpacer: { flex: 1 },
+  userField: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: R.xs,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md,
+  },
+  image: { borderRadius: R.sm, borderWidth: 1, marginVertical: SP.xs },
+  error: {
+    borderWidth: 1,
+    borderRadius: R.xs,
+    padding: SP.md,
+    marginBottom: SP.sm,
+  },
+  errorHead: { flexDirection: "row", alignItems: "center", gap: SP.sm },
+  errorAction: { flexDirection: "row", marginTop: SP.md },
   editInput: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
-    minHeight: 80,
+    borderRadius: R.sm,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md,
+    fontSize: 16,
+    lineHeight: 22,
+    minHeight: 120,
     textAlignVertical: "top",
     borderWidth: StyleSheet.hairlineWidth,
   },
-  editActions: { flexDirection: "row", gap: 8, marginTop: 12, justifyContent: "flex-end" },
-  ghostBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1 },
-  primaryBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
 });

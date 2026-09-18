@@ -54,6 +54,12 @@ export interface ChatMessage {
   content: string | ContentPart[];
   createdAt: number;
   usage?: TokenUsage;
+  /**
+   * Set when the provider call failed. Kept beside `content` rather than
+   * appended to it, so the UI can render a real error state with a retry
+   * instead of a reply that merely reads like prose.
+   */
+  error?: string;
 }
 
 export interface ChatThread {

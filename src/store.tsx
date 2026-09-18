@@ -244,13 +244,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                     ...t,
                     messages: t.messages.map((m) =>
                       m.id === assistantMsg.id
-                        ? {
-                            ...m,
-                            content:
-                              typeof m.content === "string" && m.content.trim()
-                                ? m.content + `\n\n⚠️ ${message}`
-                                : message,
-                          }
+                        ? { ...m, error: message }
                         : m,
                     ),
                   }

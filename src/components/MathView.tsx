@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
-import { useTheme } from "../theme";
-import { FONTS } from "../fonts";
+import { R, SP, useTheme } from "../theme";
+import { FONTS, T } from "../fonts";
 
 /** Render LaTeX pakai KaTeX di WebView. Kalau gagal → tampilkan code block biasa. */
 export function MathView({ tex, display }: { tex: string; display?: boolean }) {
@@ -93,7 +93,7 @@ try {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: 10, marginBottom: 12 },
+  wrap: { marginTop: SP.md, marginBottom: SP.md },
   loading: {
     position: "absolute",
     left: 0,
@@ -104,14 +104,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   code: {
-    marginVertical: 6,
-    borderRadius: 10,
+    marginVertical: SP.sm,
+    borderRadius: R.sm,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: 12,
+    padding: SP.md,
   },
   codeText: {
     fontFamily: FONTS.mono,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: T.mono,
+    lineHeight: 20,
   },
 });

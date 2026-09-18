@@ -3,8 +3,8 @@ import * as WebBrowser from "expo-web-browser";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
-import { useTheme } from "../theme";
-import { FONTS } from "../fonts";
+import { R, SP, useTheme } from "../theme";
+import { FONTS, T } from "../fonts";
 import { MathView } from "./MathView";
 
 /** Highlighter ringan tanpa lib eksternal. */
@@ -361,13 +361,15 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
   const segments = parseSegments(body);
 
   const styles = {
-    body: { color: fg, fontSize: 15, lineHeight: 21 },
+    // Light on a dark substrate reads thinner and brighter than it measures,
+    // so the transcript gets more leading than the same size would on paper.
+    body: { color: fg, fontSize: T.body, lineHeight: 24, letterSpacing: 0.1 },
     text: { color: fg },
-    paragraph: { marginTop: 0, marginBottom: 10, color: fg },
-    heading1: { color: fg, fontSize: 20, fontWeight: "700" as const, marginTop: 10, marginBottom: 6 },
-    heading2: { color: fg, fontSize: 18, fontWeight: "700" as const, marginTop: 9, marginBottom: 5 },
-    heading3: { color: fg, fontSize: 16, fontWeight: "700" as const, marginTop: 8, marginBottom: 4 },
-    heading4: { color: fg, fontSize: 15, fontWeight: "700" as const, marginTop: 8, marginBottom: 4 },
+    paragraph: { marginTop: 0, marginBottom: SP.md, color: fg },
+    heading1: { color: fg, fontSize: T.title, fontWeight: "700" as const, marginTop: SP.md, marginBottom: SP.sm },
+    heading2: { color: fg, fontSize: 17, fontWeight: "700" as const, marginTop: SP.md, marginBottom: SP.sm },
+    heading3: { color: fg, fontSize: T.heading, fontWeight: "600" as const, marginTop: SP.md, marginBottom: SP.xs },
+    heading4: { color: fg, fontSize: T.body, fontWeight: "600" as const, marginTop: SP.md, marginBottom: SP.xs },
     link: { color: c.accent, textDecorationLine: "underline" as const },
     strong: { fontWeight: "700" as const },
     em: { fontStyle: "italic" as const },
@@ -375,44 +377,44 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
       backgroundColor: c.codeBg,
       color: c.accent,
       fontFamily: FONTS.mono,
-      fontSize: 13,
-      paddingHorizontal: 4,
-      borderRadius: 4,
+      fontSize: T.mono,
+      paddingHorizontal: SP.xs,
+      borderRadius: R.xs,
     },
     code_block: {
       backgroundColor: "transparent",
       color: fg,
       fontFamily: FONTS.mono,
-      fontSize: 13,
+      fontSize: T.mono,
       padding: 0,
-      marginTop: 10,
-      marginBottom: 12,
+      marginTop: SP.md,
+      marginBottom: SP.md,
     },
     fence: {
       backgroundColor: "transparent",
       color: fg,
       fontFamily: FONTS.mono,
-      fontSize: 13,
+      fontSize: T.mono,
       padding: 0,
-      marginTop: 10,
-      marginBottom: 12,
+      marginTop: SP.md,
+      marginBottom: SP.md,
     },
     blockquote: {
-      borderLeftWidth: 3,
-      borderLeftColor: c.accent,
-      paddingLeft: 10,
-      paddingVertical: 6,
-      paddingRight: 8,
-      marginVertical: 4,
+      borderLeftWidth: 2,
+      borderLeftColor: c.accentLine,
+      paddingLeft: SP.md,
+      paddingVertical: SP.sm,
+      paddingRight: SP.sm,
+      marginVertical: SP.sm,
       backgroundColor: c.panel,
       color: c.muted,
       fontStyle: "italic" as const,
-      borderRadius: 4,
+      borderRadius: R.xs,
     },
     bullet_list_icon: { color: c.muted },
     ordered_list_icon: { color: c.muted },
     hr: { backgroundColor: c.border, height: StyleSheet.hairlineWidth },
-    table: { marginVertical: 8 },
+    table: { marginVertical: SP.sm },
     th: { color: fg, fontWeight: "700" as const },
     td: { color: fg },
   };
@@ -474,28 +476,28 @@ export function MarkdownRenderer({ body, tint }: { body: string; tint?: string }
 
 const styles = StyleSheet.create({
   codeCard: {
-    borderRadius: 10,
+    borderRadius: R.sm,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: 12,
-    marginVertical: 6,
+    padding: SP.md,
+    marginVertical: SP.sm,
   },
   codeLine: {
     fontFamily: FONTS.mono,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: T.mono,
+    lineHeight: 20,
   },
   codeTok: {
     fontFamily: FONTS.mono,
-    fontSize: 13,
+    fontSize: T.mono,
   },
 });
 
 const stylesTable = StyleSheet.create({
   wrap: {
-    marginTop: 14,
-    marginBottom: 16,
+    marginTop: SP.md,
+    marginBottom: SP.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
+    borderRadius: R.sm,
     overflow: "hidden",
     width: "100%",
   },
@@ -507,18 +509,18 @@ const stylesTable = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   cell: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.sm,
     borderRightWidth: StyleSheet.hairlineWidth,
     justifyContent: "center",
   },
   thText: {
-    fontSize: 13,
+    fontSize: T.mono,
     fontWeight: "700",
     lineHeight: 18,
   },
   tdText: {
-    fontSize: 13,
+    fontSize: T.mono,
     lineHeight: 18,
   },
 });

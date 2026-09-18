@@ -1,133 +1,178 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useI18n } from "../i18n";
 import { getActiveProvider, getProvider, resolveModelInfo } from "../services/providers";
 import { fetchProviderModels } from "../services/models";
 import { useStore } from "../store";
-import { useTheme } from "../theme";
+import { R, SP, useTheme } from "../theme";
+import { TXT } from "../fonts";
+import { Button, IconButton, Meter, Row, useReducedMotion } from "./ui";
 import { Sheet } from "./Sheet";
 
-/** Dropdown pemilih model: fetch SEMUA model dari GET /models (fallback ke
- * template kalau gagal). Reasoning pindah ke Composer. */
+/**
+ * Model picker.
+ *
+ * A provider's model list comes from `GET /models` and can be long, so the
+ * search field and the count are part of the interface rather than an
+ * afterthought. Loading, empty, error and overflow all have their own state.
+ */
 export function ModelSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { settings, setModel } = useStore();
   const { c } = useTheme();
   const { t } = useI18n();
-  const [models, setModels] = useState<string[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const reduced = useReducedMotion();
 
   const provider = getActiveProvider(settings);
   const template = getProvider(provider.kind);
 
-  // Fetch daftar model tiap kali sheet dibuka (pakai cache di services/models).
+  const [models, setModels] = useState<string[] | null>(null);
+  const [error, setError] = useState(false);
+  const [query, setQuery] = useState("");
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      return;
+    }
     let cancelled = false;
-    setLoading(true);
-    void fetchProviderModels(provider).then((list) => {
-      if (!cancelled) {
-        setModels(list);
-        setLoading(false);
-        setError(list === null);
+    void fetchProviderModels(provider, attempt > 0).then((list) => {
+      if (cancelled) {
+        return;
       }
+      setModels(list);
+      setError(list === null);
     });
     return () => {
       cancelled = true;
     };
-  }, [visible, provider]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, provider.id, attempt]);
 
-  const pick = (model: string) => {
-    const clean = model.trim();
-    if (clean) setModel(clean);
+  // Derived, not stored: if we have no list and no error, we are still waiting.
+  const loading = models === null && !error;
+
+  const close = () => {
+    setQuery("");
     onClose();
   };
 
-  // Custom model yang tidak ada di list tetap tampil di atas (dipilih).
-  const list = models ?? template.models;
-  const all = list.includes(provider.model) ? list : [provider.model, ...list];
+  // A custom model that is not in the fetched list still has to be visible,
+  // or the selected model would disappear from its own picker.
+  const base = models ?? template.models;
+  const all = base.includes(provider.model) || !provider.model ? base : [provider.model, ...base];
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? all.filter((m) => m.toLowerCase().includes(needle)) : all;
 
   return (
-    <Sheet visible={visible} title={provider.name} onClose={onClose}>
-      <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <Text style={[styles.status, { color: c.muted }]}>{t("settings.testing")}</Text>
+    <Sheet
+      visible={visible}
+      kicker={t("chat.model")}
+      title={provider.name}
+      onClose={close}
+      footer={
+        <>
+          <Text style={[TXT.label, { color: c.faint, flex: 1, alignSelf: "center" }]}>
+            {t("model.count", { n: all.length })}
+          </Text>
+          <Button
+            label={t("model.refresh")}
+            variant="ghost"
+            icon="refresh"
+            onPress={() => setAttempt((a) => a + 1)}
+            loading={loading}
+          />
+        </>
+      }
+    >
+      <View style={[styles.search, { backgroundColor: c.panel, borderColor: c.border }]}>
+        <Ionicons name="search" size={15} color={c.faint} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t("model.search")}
+          placeholderTextColor={c.faint}
+          accessibilityLabel={t("model.search")}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={[styles.searchInput, { color: c.text }]}
+        />
+        {query ? (
+          <IconButton
+            icon="close-circle"
+            size={28}
+            onPress={() => setQuery("")}
+            label={t("common.close")}
+          />
         ) : null}
-        {error && !loading ? (
-          <Text style={[styles.status, { color: c.danger }]}>{t("model.listOffline")}</Text>
-        ) : null}
+      </View>
 
-        {all.map((m) => {
-          const selected = provider.model === m;
-          const info = resolveModelInfo(provider.kind, m);
-          return (
-            <Pressable
-              key={m}
-              onPress={() => pick(m)}
-              style={[styles.row, selected && { backgroundColor: c.panel }]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.rowTitle, { color: c.text }]} numberOfLines={1}>
-                  {m}
-                </Text>
-                {info.label !== m || info.blurbKey ? (
-                  <Text style={[styles.rowSub, { color: c.muted }]} numberOfLines={1}>
-                    {[info.label !== m ? info.label : null, info.blurbKey ? t(info.blurbKey as never) : null]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </Text>
-                ) : null}
-              </View>
-              {selected ? <Ionicons name="checkmark" size={18} color={c.accent} /> : null}
-            </Pressable>
-          );
-        })}
-
-        <View style={[styles.divider, { backgroundColor: c.border }]} />
-        <View style={styles.customRow}>
-          <Pressable
-            onPress={() => void fetchProviderModels(provider, true).then((l) => {
-              if (l) {
-                setModels(l);
-                setError(false);
-              } else {
-                setError(true);
-              }
-            })}
-            style={[styles.refreshBtn, { borderColor: c.border }]}
-          >
-            <Ionicons name="refresh-outline" size={15} color={c.muted} />
-            <Text style={{ fontSize: 12, color: c.muted }}>{t("model.refresh")}</Text>
-          </Pressable>
+      {error ? (
+        <View style={[styles.notice, { borderColor: c.danger, backgroundColor: c.raised }]}>
+          <View style={styles.noticeHead}>
+            <Ionicons name="cloud-offline-outline" size={16} color={c.danger} />
+            <Text style={[TXT.label, { color: c.danger, flex: 1 }]}>
+              {t("model.listOfflineTitle")}
+            </Text>
+          </View>
+          <Text style={[TXT.small, { color: c.muted, marginTop: SP.xs }]}>
+            {t("model.listOffline")}
+          </Text>
         </View>
-      </ScrollView>
+      ) : null}
+
+      {loading && !models ? (
+        <View style={styles.loading}>
+          <Meter active reduced={reduced} />
+          <Text style={[TXT.label, { color: c.faint }]}>{t("model.loading")}</Text>
+        </View>
+      ) : null}
+
+      {shown.length === 0 && !loading && !error ? (
+        <View style={[styles.notice, { borderColor: c.border }]}>
+          <Text style={[TXT.body, { color: c.muted }]}>{t("model.noMatches", { q: query })}</Text>
+        </View>
+      ) : null}
+
+      {shown.map((m) => {
+        const selected = provider.model === m;
+        const info = resolveModelInfo(provider.kind, m);
+        const blurb = info.blurbKey ? t(info.blurbKey as never) : undefined;
+        const desc = [info.label !== m ? info.label : null, blurb].filter(Boolean).join("  ·  ");
+        return (
+          <Row
+            key={m}
+            flush
+            label={m}
+            desc={desc || undefined}
+            tone={selected ? "accent" : "default"}
+            onPress={() => {
+              setModel(m.trim());
+              close();
+            }}
+            right={
+              selected ? <Ionicons name="checkmark" size={18} color={c.accent} /> : undefined
+            }
+          />
+        );
+      })}
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { maxHeight: 420 },
-  status: { fontSize: 13, paddingHorizontal: 10, paddingVertical: 8 },
-  row: {
+  search: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 14,
+    gap: SP.sm,
+    borderRadius: R.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingLeft: SP.md,
+    paddingRight: SP.xs,
+    minHeight: 42,
   },
-  rowTitle: { fontSize: 15, fontWeight: "600" },
-  rowSub: { fontSize: 12, marginTop: 2 },
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: 8 },
-  customRow: { flexDirection: "row", justifyContent: "center", marginTop: 4, marginBottom: 8 },
-  refreshBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
+  searchInput: { flex: 1, fontSize: 15, lineHeight: 20, paddingVertical: SP.sm },
+  notice: { borderWidth: 1, borderRadius: R.xs, padding: SP.md, marginTop: SP.xs },
+  noticeHead: { flexDirection: "row", alignItems: "center", gap: SP.sm },
+  loading: { flexDirection: "row", alignItems: "center", gap: SP.md, paddingVertical: SP.md },
 });

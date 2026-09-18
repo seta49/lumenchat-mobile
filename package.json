@@ -4,6 +4,8 @@
   "main": "expo-router/entry",
   "version": "0.3.0",
   "dependencies": {
+    "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
+    "@expo-google-fonts/ibm-plex-sans": "^0.4.1",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/sora": "^0.4.2",
     "@expo/ui": "~57.0.14",

@@ -1,118 +1,180 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanResponder } from "react-native";
 import {
   FlatList,
-  Pressable,
+  PanResponder,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type ListRenderItemInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatMessage } from "../components/ChatMessage";
 import { Composer } from "../components/Composer";
 import { ModelSheet } from "../components/ModelSheet";
+import { SettingsOverlay } from "../components/SettingsOverlay";
 import { Sidebar } from "../components/Sidebar";
+import { IconButton, Meter, Panel, Touch, useReducedMotion } from "../components/ui";
 import { useI18n } from "../i18n";
 import { useStore } from "../store";
-import { useTheme } from "../theme";
+import { providerMark, R, SP, useTheme } from "../theme";
+import { TXT } from "../fonts";
 import type { ChatMessage as ChatMessageType } from "../types/chat";
-import { contentToText } from "../services/ai";
 
-function EmptyState() {
+/**
+ * The routing bar.
+ *
+ * The provider and model are the only genuinely variable objects in this app,
+ * so they get the top of the screen instead of a 13px chip. The spine on the
+ * left carries the provider's hue, and it turns to the signal colour while an
+ * answer is streaming: the light tells you what is running.
+ */
+function RoutingBar({ onOpenDrawer, onOpenModel, onOpenSettings }: {
+  onOpenDrawer: () => void;
+  onOpenModel: () => void;
+  onOpenSettings: () => void;
+}) {
+  const { settings, streamingId, createThread } = useStore();
   const { c } = useTheme();
   const { t } = useI18n();
-  const { settings } = useStore();
-  const name = settings.profileName?.trim();
+  const insets = useSafeAreaInsets();
+  const reduced = useReducedMotion();
+
+  const provider =
+    settings.providers.find((p) => p.id === settings.activeProviderId) ?? settings.providers[0];
+  const streaming = streamingId !== null;
+  const model = provider?.model || t("settings.modelPlaceholder");
+
   return (
-    <View style={styles.empty}>
-      <SparkleMark />
-      <Text style={[styles.greeting, { color: c.text }]}>
-        {name ? t("chat.greeting", { name }) : t("chat.greetingDefault")}
-      </Text>
+    <View
+      style={[
+        styles.bar,
+        {
+          backgroundColor: c.bg,
+          borderBottomColor: c.border,
+          paddingTop: insets.top + SP.sm,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.spine,
+          { backgroundColor: streaming ? c.accent : providerMark(provider?.kind ?? "custom") },
+        ]}
+      />
+
+      <IconButton icon="menu" onPress={onOpenDrawer} label={t("sidebar.history")} tone="text" />
+
+      <Touch
+        onPress={onOpenModel}
+        label={t("chat.model")}
+        accessibilityHint={t("chat.changeModel")}
+        style={styles.readout}
+        hover={{ backgroundColor: c.panel }}
+        press={{ backgroundColor: c.panel }}
+      >
+        <View style={styles.readoutTop}>
+          <Text style={[TXT.readout, { color: c.text, flexShrink: 1 }]} numberOfLines={1}>
+            {model}
+          </Text>
+          {streaming ? (
+            <Meter active reduced={reduced} />
+          ) : (
+            <Ionicons name="chevron-down" size={14} color={c.faint} />
+          )}
+        </View>
+        <Text style={[TXT.label, { color: c.faint }]} numberOfLines={1}>
+          {[provider?.name ?? "—", provider?.apiFormat ?? ""].filter(Boolean).join("  ·  ")}
+        </Text>
+      </Touch>
+
+      <IconButton
+        icon="create-outline"
+        onPress={createThread}
+        label={t("sidebar.newChat")}
+      />
+      <IconButton icon="options-outline" onPress={onOpenSettings} label={t("common.settings")} />
     </View>
   );
 }
 
-/** Sparkle 4-titik ala Gemini — digambar dengan 4 View rotated, no assets. */
-function SparkleMark() {
+/** First run: teach the space instead of floating a glyph in the middle of it. */
+function EmptyState() {
+  const { settings } = useStore();
   const { c } = useTheme();
-  const dots = [
-    { x: 0, y: -14, col: c.accent },
-    { x: 14, y: 0, col: c.accent + "cc" },
-    { x: 0, y: 14, col: c.accent + "99" },
-    { x: -14, y: 0, col: c.accent + "66" },
-  ];
+  const { t } = useI18n();
+  const provider =
+    settings.providers.find((p) => p.id === settings.activeProviderId) ?? settings.providers[0];
+
   return (
-    <View style={styles.sparkleWrap}>
-      {dots.map((d, i) => (
-        <View
-          key={i}
-          style={[
-            styles.sparkleDot,
-            {
-              backgroundColor: d.col,
-              transform: [
-                { translateX: d.x },
-                { translateY: d.y },
-                { rotate: "45deg" },
-              ],
-            },
-          ]}
-        />
-      ))}
+    <View style={styles.emptyWrap}>
+      <Panel style={styles.emptyPanel}>
+        <View style={[styles.emptySpine, { backgroundColor: providerMark(provider?.kind ?? "custom") }]} />
+        <View style={styles.emptyBody}>
+          <Text style={[TXT.label, { color: c.faint }]}>{t("chat.newSession")}</Text>
+          <Text style={[TXT.display, { color: c.text, marginTop: SP.sm }]}>
+            {t("chat.emptyTitle")}
+          </Text>
+          <Text style={[TXT.body, { color: c.muted, marginTop: SP.sm }]}>
+            {t("chat.emptySubtitle")}
+          </Text>
+
+          <View style={[styles.emptyMeta, { borderTopColor: c.border }]}>
+            <View style={styles.emptyMetaRow}>
+              <Text style={[TXT.label, { color: c.faint }]}>{t("common.provider")}</Text>
+              <Text style={[TXT.readout, { color: c.muted }]} numberOfLines={1}>
+                {provider?.name ?? "—"}
+              </Text>
+            </View>
+            <View style={styles.emptyMetaRow}>
+              <Text style={[TXT.label, { color: c.faint }]}>{t("chat.model")}</Text>
+              <Text style={[TXT.readout, { color: c.muted }]} numberOfLines={1}>
+                {provider?.model || t("settings.modelPlaceholder")}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Panel>
     </View>
   );
 }
 
 export function ChatScreen() {
-  const {
-    activeThread,
-    streamingId,
-    settings,
-    createThread,
-    updateSettings,
-  } = useStore();
+  const { activeThread, streamingId, updateSettings } = useStore();
   const { c } = useTheme();
   const { t } = useI18n();
-  const insets = useSafeAreaInsets();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQ, setSearchQ] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Bumping the session remounts the settings panel, so it always opens on its
+  // first screen with no reset effect to keep in sync.
+  const [settingsSession, setSettingsSession] = useState(0);
   const listRef = useRef<FlatList<ChatMessageType>>(null);
+  const [atBottom, setAtBottom] = useState(true);
 
-  // Edge swipe dari kiri → buka sidebar (hanya saat drag, gak block tap)
-  const edgePan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (evt, g) =>
-        evt.nativeEvent.pageX < 28 && g.dx > 12 && Math.abs(g.dy) < 30,
-      onPanResponderRelease: (_evt, g) => {
-        if (g.dx > 48) setSidebarOpen(true);
-      },
-    }),
-  ).current;
+  // Edge swipe from the left opens the drawer. The zone is confined to the
+  // transcript so it can never swallow a tap on the composer.
+  const edgePan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (evt, g) =>
+          evt.nativeEvent.pageX < 28 && g.dx > 12 && Math.abs(g.dy) < 30,
+        onPanResponderRelease: (_evt, g) => {
+          if (g.dx > 48) setSidebarOpen(true);
+        },
+      }),
+    [],
+  );
 
   const messages = activeThread?.messages ?? [];
-  const provider =
-    settings.providers.find((p) => p.id === settings.activeProviderId) ?? settings.providers[0];
-  const modelLabel = provider?.model ?? "";
   const empty = messages.length === 0;
 
-  const searchHits = useMemo(() => {
-    if (!searchQ.trim()) return [];
-    const q = searchQ.toLowerCase();
-    return messages
-      .filter((m) => contentToText(m.content).toLowerCase().includes(q))
-      .map((m) => m.id);
-  }, [messages, searchQ]);
-
-  // Share intent Android (SEND text/plain) → isi composer via settings.pendingShare
+  // Android share intent
   useEffect(() => {
     const handleShare = (url: string) => {
       try {
@@ -134,180 +196,140 @@ export function ChatScreen() {
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<ChatMessageType>) => (
-      <ChatMessage
-        message={item}
-        streaming={streamingId === item.id}
-        highlight={searchQ.trim() ? searchQ : undefined}
-      />
+      <ChatMessage message={item} streaming={streamingId === item.id} />
     ),
-    [streamingId, searchQ],
+    [streamingId],
   );
+
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distance = contentSize.height - contentOffset.y - layoutMeasurement.height;
+    // Only follow the stream when the reader is already at the bottom. Yanking
+    // someone back down mid-read is the fastest way to lose their place.
+    setAtBottom(distance < 96);
+  }, []);
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: c.bg,
-            borderBottomColor: c.border,
-            paddingTop: insets.top + 6,
-          },
-        ]}
-      >
-        <Pressable onPress={() => setSidebarOpen(true)} hitSlop={8} style={styles.headerBtn}>
-          <Ionicons name="menu" size={22} color={c.text} />
-        </Pressable>
-
-        <Pressable onPress={() => setModelOpen(true)} style={styles.modelChip}>
-          <Text numberOfLines={1} style={[styles.modelChipText, { color: c.text }]}>
-            {modelLabel}
-          </Text>
-          <Ionicons name="chevron-down" size={14} color={c.muted} />
-        </Pressable>
-
-        <View style={{ flex: 1 }} />
-
-        <Pressable
-          onPress={() => {
-            setSearchOpen((v) => !v);
-            if (searchOpen) setSearchQ("");
-          }}
-          hitSlop={8}
-          style={styles.headerBtn}
-        >
-          <Ionicons
-            name={searchOpen ? "close" : "search"}
-            size={20}
-            color={searchOpen ? c.accent : c.text}
-          />
-        </Pressable>
-
-        <Pressable
-          onPress={() => createThread()}
-          hitSlop={8}
-          style={styles.headerBtn}
-          accessibilityLabel={t("sidebar.newChat")}
-        >
-          <Ionicons name="create-outline" size={21} color={c.text} />
-        </Pressable>
-      </View>
-
-      {searchOpen ? (
-        <View style={[styles.searchBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
-          <Ionicons name="search" size={15} color={c.muted} />
-          <TextInput
-            value={searchQ}
-            onChangeText={setSearchQ}
-            placeholder={t("chat.search")}
-            placeholderTextColor={c.muted}
-            autoFocus
-            style={[styles.searchInput, { color: c.text }]}
-          />
-          {searchQ ? (
-            <Text style={{ color: c.muted, fontSize: 12 }}>
-              {t("chat.searchHits", { n: searchHits.length })}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
+      <RoutingBar
+        onOpenDrawer={() => setSidebarOpen(true)}
+        onOpenModel={() => setModelOpen(true)}
+        onOpenSettings={() => {
+          setSettingsSession((s) => s + 1);
+          setSettingsOpen(true);
+        }}
+      />
 
       <KeyboardAvoidingView style={styles.root} behavior="padding">
-        {empty ? (
-          <View style={styles.emptyWrap}>
+        <View style={styles.transcript}>
+          {empty ? (
             <EmptyState />
-          </View>
-        ) : (
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(m) => m.id}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            keyboardShouldPersistTaps="handled"
-            // Optimasi chat panjang
-            initialNumToRender={12}
-            maxToRenderPerBatch={10}
-            windowSize={11}
-            removeClippedSubviews
-            updateCellsBatchingPeriod={50}
-            onContentSizeChange={() => {
-              listRef.current?.scrollToEnd({ animated: false });
-            }}
-          />
-        )}
+          ) : (
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={(m) => m.id}
+              renderItem={renderItem}
+              contentContainerStyle={styles.listContent}
+              keyboardShouldPersistTaps="handled"
+              onScroll={onScroll}
+              scrollEventThrottle={32}
+              initialNumToRender={12}
+              maxToRenderPerBatch={10}
+              windowSize={11}
+              removeClippedSubviews
+              updateCellsBatchingPeriod={50}
+              onContentSizeChange={() => {
+                if (atBottom) {
+                  listRef.current?.scrollToEnd({ animated: false });
+                }
+              }}
+            />
+          )}
+
+          {!empty && !atBottom ? (
+            <View style={styles.jumpWrap} pointerEvents="box-none">
+              <Touch
+                onPress={() => listRef.current?.scrollToEnd({ animated: true })}
+                label={t("chat.jumpToBottom")}
+                radius={R.sm}
+                style={[styles.jump, { backgroundColor: c.raised, borderColor: c.borderStrong }]}
+                hover={{ backgroundColor: c.panel }}
+                press={{ opacity: 0.75 }}
+              >
+                <Ionicons name="arrow-down" size={14} color={c.text} />
+                <Text style={[TXT.label, { color: c.text }]}>{t("chat.jumpToBottom")}</Text>
+              </Touch>
+            </View>
+          ) : null}
+
+          <View style={styles.edgeHit} {...edgePan.panHandlers} />
+        </View>
+
         <Composer />
-        {/* Overlay tipis di tepi kiri untuk detect edge swipe */}
-        <View
-          style={styles.edgeHit}
-          {...edgePan.panHandlers}
-        />
       </KeyboardAvoidingView>
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <ModelSheet visible={modelOpen} onClose={() => setModelOpen(false)} />
+      <SettingsOverlay
+        key={settingsSession}
+        visible={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
+  transcript: { flex: 1 },
+
+  bar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingBottom: 8,
-    paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 4,
-  },
-  headerBtn: { padding: 8 },
-  modelChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    maxWidth: "45%",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  modelChipText: { fontSize: 15, fontWeight: "700" },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: SP.sm,
+    paddingBottom: SP.sm,
+    gap: SP.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  searchInput: { flex: 1, fontSize: 14, padding: 0 },
-  listContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  emptyWrap: {
+  spine: { width: 2, height: 34, borderRadius: 1, marginRight: SP.xs },
+  readout: {
     flex: 1,
-    backgroundColor: "transparent",
+    minWidth: 0,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+    gap: 3,
   },
-  edgeHit: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 24,
-  },
-  empty: {
-    flex: 1,
+  readoutTop: { flexDirection: "row", alignItems: "center", gap: SP.sm },
+
+  listContent: { paddingHorizontal: SP.sm, paddingVertical: SP.md },
+
+  jumpWrap: { position: "absolute", left: 0, right: 0, bottom: SP.md, alignItems: "center" },
+  jump: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-    paddingBottom: 60,
+    gap: SP.xs,
+    borderWidth: 1,
+    paddingHorizontal: SP.md,
+    minHeight: 36,
   },
-  sparkleWrap: {
-    width: 60,
-    height: 60,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 18,
+
+  edgeHit: { position: "absolute", left: 0, top: 0, bottom: 0, width: 22 },
+
+  emptyWrap: { flex: 1, paddingHorizontal: SP.lg, paddingTop: SP.macro },
+  emptyPanel: { flexDirection: "row", padding: 0, overflow: "hidden" },
+  emptySpine: { width: 2 },
+  emptyBody: { flex: 1, padding: SP.lg },
+  emptyMeta: {
+    marginTop: SP.xl,
+    paddingTop: SP.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: SP.sm,
   },
-  sparkleDot: { position: "absolute", width: 12, height: 12, borderRadius: 3 },
-  greeting: { fontSize: 24, fontWeight: "500", textAlign: "center", lineHeight: 32 },
+  emptyMetaRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: SP.md,
+  },
 });

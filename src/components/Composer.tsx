@@ -3,24 +3,32 @@ import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import { File } from "expo-file-system";
 import { useEffect, useState } from "react";
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button, IconButton, Row, Touch } from "./ui";
+import { Sheet } from "./Sheet";
 import { useI18n } from "../i18n";
 import { getActiveProvider } from "../services/providers";
 import { useStore } from "../store";
-import { useTheme } from "../theme";
+import { R, SP, useTheme } from "../theme";
+import { TXT } from "../fonts";
 import { pickAndCompressImage } from "../utils/image";
 import { useOptionalVoice } from "../utils/voice";
 import type { ContentPart } from "../types/chat";
-import { Sheet } from "./Sheet";
 
 interface FileAttachment {
   name: string;
   text: string;
 }
 
-/** Composer: pill [+][input][reasoning][send], keyboard-aware native,
- * attach gambar + dokumen (txt/md/json/csv/kode). */
+/**
+ * The composer is a two-tier strip, not a floating pill.
+ *
+ * The field gets the full width of the device instead of sharing a single row
+ * with four controls, and the controls sit on their own rail where each one
+ * can hold a real 44pt target. The primary action lands in the bottom-right
+ * thumb zone.
+ */
 export function Composer() {
   const { settings, streamingId, send, stop, updateSettings, setThinking } = useStore();
   const { t } = useI18n();
@@ -32,9 +40,11 @@ export function Composer() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(false);
 
-  // Share intent (SEND text/plain) → isi composer sekali.
+  // Share intent (SEND text/plain) fills the field once. This is a bridge from
+  // an external event into local state, which is what an effect is for.
   useEffect(() => {
     if (settings.pendingShare) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- consuming a one-shot Android share intent
       setText((prev) => (prev ? `${prev}\n${settings.pendingShare}` : settings.pendingShare ?? ""));
       updateSettings({ pendingShare: undefined });
     }
@@ -57,9 +67,7 @@ export function Composer() {
   }, []);
 
   const provider = getActiveProvider(settings);
-  const thinking = provider?.thinking ?? "off";
-  const thinkingOn = thinking !== "off";
-  const thinkingLabel = thinkingOn ? t("chat.thinkingOn") : t("chat.thinkingOff");
+  const thinkingOn = (provider?.thinking ?? "off") !== "off";
 
   const streaming = streamingId !== null;
   const canSend = text.trim().length > 0 || images.length > 0 || files.length > 0;
@@ -72,7 +80,7 @@ export function Composer() {
         setImages((im) => [...im, part]);
       }
     } catch {
-      // user cancel / permission denied — diam saja
+      // user cancelled or denied permission
     }
   };
 
@@ -94,31 +102,25 @@ export function Composer() {
         return;
       }
       const asset = res.assets[0];
-      // Baca sebagai teks (isi dipotong biar hemat).
       const content = await new File(asset.uri).text();
       const clipped = content.length > 60_000 ? content.slice(0, 60_000) : content;
       setFiles((f) => [...f, { name: asset.name ?? "file", text: clipped }]);
     } catch {
-      // user cancel — diam saja
+      // user cancelled
     }
   };
-
-  const removeFile = (i: number) => setFiles((f) => f.filter((_, j) => j !== i));
 
   const onSend = () => {
     if (!canSend || streaming) {
       return;
     }
-    // File dijadikan teks context di depan prompt user.
     let final = text;
     if (files.length) {
       const blocks = files
         .map((f) => `--- file: ${f.name} ---\n${f.text}`)
         .join("\n\n");
-      final = final.trim() ? `${blocksHeader(files.length)}${blocks}\n\n${text}` : `${blocks}\n${""}`;
-      if (!text.trim()) {
-        final = blocks;
-      }
+      const header = files.length > 1 ? `${t("file.attached", { n: files.length })}\n\n` : "";
+      final = text.trim() ? `${header}${blocks}\n\n${text}` : blocks;
     }
     const imgs = images;
     setText("");
@@ -127,9 +129,6 @@ export function Composer() {
     void send(final, imgs);
   };
 
-  const blocksHeader = (n: number) =>
-    n > 1 ? `${t("file.attached", { n })}\n\n` : "";
-
   return (
     <View
       style={[
@@ -137,119 +136,128 @@ export function Composer() {
         {
           backgroundColor: c.bg,
           borderTopColor: c.border,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          paddingBottom: kbOpen ? 8 : Math.max(insets.bottom, 10),
+          paddingBottom: kbOpen ? SP.sm : Math.max(insets.bottom, SP.sm),
         },
       ]}
     >
       {images.length > 0 || files.length > 0 ? (
-        <View style={styles.thumbRow}>
+        <View style={styles.attachmentRail}>
           {images.map((part, i) => (
             <View key={`img${i}`} style={styles.thumb}>
               <Image
                 source={{ uri: part.image_url?.url }}
-                style={styles.thumbImage}
+                style={[styles.thumbImage, { borderColor: c.border }]}
                 contentFit="cover"
               />
-              <Pressable
+              <Touch
                 onPress={() => setImages((im) => im.filter((_, j) => j !== i))}
-                style={[styles.thumbRemove, { backgroundColor: c.danger }]}
-                hitSlop={6}
+                label={t("chat.removeImage")}
+                radius={R.xs}
+                style={[styles.thumbRemove, { backgroundColor: c.raised, borderColor: c.borderStrong }]}
+                press={{ opacity: 0.7 }}
               >
-                <Ionicons name="close" size={12} color="#ffffff" />
-              </Pressable>
+                <Ionicons name="close" size={12} color={c.text} />
+              </Touch>
             </View>
           ))}
           {files.map((f, i) => (
-            <View key={`file${i}`} style={[styles.fileChip, { backgroundColor: c.panel, borderColor: c.border }]}>
-              <Ionicons name="document-text-outline" size={14} color={c.text} />
-              <Text numberOfLines={1} style={[styles.fileName, { color: c.text }]}>
+            <View
+              key={`file${i}`}
+              style={[styles.fileChip, { backgroundColor: c.panel, borderColor: c.border }]}
+            >
+              <Ionicons name="document-text-outline" size={13} color={c.muted} />
+              <Text style={[TXT.small, { color: c.text, maxWidth: 120 }]} numberOfLines={1}>
                 {f.name}
               </Text>
-              <Pressable onPress={() => removeFile(i)} hitSlop={6} style={styles.fileRemove}>
-                <Ionicons name="close" size={12} color={c.muted} />
-              </Pressable>
+              <Touch
+                onPress={() => setFiles((list) => list.filter((_, j) => j !== i))}
+                label={`${t("common.remove")} ${f.name}`}
+                radius={R.xs}
+                style={styles.fileRemove}
+                press={{ opacity: 0.6 }}
+              >
+                <Ionicons name="close" size={13} color={c.muted} />
+              </Touch>
             </View>
           ))}
         </View>
       ) : null}
 
-      <View style={[styles.pill, { backgroundColor: c.panel, borderColor: c.border }]}>
-        <Pressable onPress={() => setToolsOpen(true)} hitSlop={8} style={styles.iconBtn}>
-          <Ionicons name="add" size={24} color={c.text} />
-        </Pressable>
-
+      <View style={[styles.field, { backgroundColor: c.panel, borderColor: c.border }]}>
         <TextInput
           value={text}
           onChangeText={setText}
           placeholder={t("chat.askLumen")}
-          placeholderTextColor={c.muted}
+          placeholderTextColor={c.faint}
           multiline
+          accessibilityLabel={t("chat.askLumen")}
           style={[styles.input, { color: c.text }]}
         />
+      </View>
 
-        <Pressable
+      <View style={styles.rail}>
+        <IconButton icon="add" onPress={() => setToolsOpen(true)} label={t("chat.attach")} tone="text" />
+
+        <Touch
           onPress={() => setThinking(thinkingOn ? "off" : "max")}
-          hitSlop={6}
+          label={t("model.reasoning")}
+          accessibilityHint={thinkingOn ? t("chat.thinkingOnHint") : t("chat.thinkingOffHint")}
+          state={{ selected: thinkingOn }}
           style={[
-            styles.reasonChip,
+            styles.reason,
             {
-              backgroundColor: thinkingOn ? c.accent + "1f" : c.input,
-              borderColor: thinkingOn ? c.accent + "55" : c.border,
+              borderColor: thinkingOn ? c.accentLine : c.border,
+              backgroundColor: thinkingOn ? c.accentSoft : "transparent",
             },
           ]}
-          accessibilityLabel={t("model.reasoning")}
+          hover={{ backgroundColor: thinkingOn ? c.accentSoft : c.panel }}
+          press={{ opacity: 0.72 }}
         >
           <Ionicons
             name="sparkles-outline"
             size={14}
-            color={thinkingOn ? c.accent : c.muted}
+            color={thinkingOn ? c.accent : c.faint}
           />
-          <Text
-            numberOfLines={1}
-            style={[styles.reasonChipText, { color: thinkingOn ? c.accent : c.muted }]}
-          >
-            {thinkingLabel}
+          <Text style={[TXT.label, { color: thinkingOn ? c.accent : c.muted }]}>
+            {thinkingOn ? t("chat.thinkingOn") : t("chat.thinkingOff")}
           </Text>
-        </Pressable>
+        </Touch>
 
-        <Pressable
+        <View style={styles.spacer} />
+
+        <IconButton
+          icon={listening ? "mic" : "mic-outline"}
           onPress={() => void toggleVoice()}
-          hitSlop={6}
-          style={[styles.iconBtn, listening && { backgroundColor: c.danger + "33" }]}
-          accessibilityLabel={listening ? t("chat.voiceStop") : t("chat.voiceStart")}
-        >
-          <Ionicons
-            name={listening ? "mic" : "mic-outline"}
-            size={20}
-            color={listening ? c.danger : c.muted}
-          />
-        </Pressable>
+          label={listening ? t("chat.voiceStop") : t("chat.voiceStart")}
+          tone={listening ? "danger" : "muted"}
+        />
 
         {streaming ? (
-          <Pressable onPress={stop} style={[styles.sendBtn, { backgroundColor: c.danger }]}>
-            <Ionicons name="stop" size={18} color="#ffffff" />
-          </Pressable>
+          <Button label={t("chat.stop")} icon="stop" variant="danger" onPress={stop} />
         ) : (
-          <Pressable
+          <Button
+            label={t("chat.send")}
+            icon="arrow-up"
+            variant="primary"
             onPress={onSend}
             disabled={!canSend}
-            style={[styles.sendBtn, { backgroundColor: canSend ? c.accent : c.input }]}
-          >
-            <Ionicons name="arrow-up" size={19} color={canSend ? c.onAccent : c.muted} />
-          </Pressable>
+          />
         )}
       </View>
 
       <Sheet visible={toolsOpen} title={t("chat.attach")} onClose={() => setToolsOpen(false)}>
-        <Pressable onPress={attach} style={styles.toolRow}>
-          <Ionicons name="images-outline" size={20} color={c.text} />
-          <Text style={{ color: c.text, fontSize: 14 }}>{t("chat.attachImage")}</Text>
-        </Pressable>
-        <Pressable onPress={attachFile} style={styles.toolRow}>
-          <Ionicons name="document-outline" size={20} color={c.text} />
-          <Text style={{ color: c.text, fontSize: 14 }}>{t("chat.attachFile")}</Text>
-        </Pressable>
+        <Row
+          label={t("chat.attachImage")}
+          desc={t("chat.attachImageHint")}
+          onPress={() => void attach()}
+          right={<Ionicons name="image-outline" size={18} color={c.muted} />}
+        />
+        <Row
+          label={t("chat.attachFile")}
+          desc={t("chat.attachFileHint")}
+          onPress={() => void attachFile()}
+          right={<Ionicons name="document-outline" size={18} color={c.muted} />}
+        />
       </Sheet>
     </View>
   );
@@ -257,82 +265,68 @@ export function Composer() {
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingHorizontal: 10,
-    paddingTop: 6,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: SP.sm,
   },
-  thumbRow: {
+  attachmentRail: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 8,
+    gap: SP.sm,
     flexWrap: "wrap",
-    paddingHorizontal: 4,
   },
   thumb: { position: "relative" },
-  thumbImage: { width: 56, height: 56, borderRadius: 12 },
+  thumbImage: { width: 56, height: 56, borderRadius: R.sm, borderWidth: 1 },
   thumbRemove: {
     position: "absolute",
     top: -6,
     right: -6,
-    borderRadius: 10,
-    padding: 2,
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
   fileChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    borderRadius: 12,
+    gap: SP.sm,
+    borderRadius: R.sm,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    maxWidth: 180,
+    paddingLeft: SP.md,
+    paddingRight: SP.xs,
+    height: 34,
+    alignSelf: "flex-end",
   },
-  fileName: { fontSize: 12, flexShrink: 1, maxWidth: 110 },
-  fileRemove: { padding: 2 },
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 28,
-    borderWidth: 1,
-    paddingLeft: 6,
-    paddingRight: 6,
-    paddingVertical: 4,
-    gap: 2,
-  },
-  iconBtn: { padding: 8 },
-  reasonChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    maxWidth: 92,
-    flexShrink: 0,
-  },
-  reasonChipText: {
-    fontSize: 11,
-    fontWeight: "600",
-    flexShrink: 1,
-  },
-  input: {
-    flex: 1,
-    maxHeight: 96,
-    fontSize: 16,
-    paddingVertical: 8,
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
+  fileRemove: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
+  field: {
+    borderRadius: R.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SP.md,
+    minHeight: 48,
     justifyContent: "center",
   },
-  toolRow: {
+  input: {
+    // 16pt keeps iOS from zooming the viewport when the field takes focus.
+    fontSize: 16,
+    lineHeight: 22,
+    letterSpacing: 0.1,
+    maxHeight: 132,
+    paddingVertical: SP.md,
+  },
+  rail: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    gap: SP.xs,
+    minHeight: 44,
   },
+  reason: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SP.sm,
+    borderWidth: 1,
+    paddingHorizontal: SP.md,
+    minHeight: 36,
+  },
+  spacer: { flex: 1 },
 });

@@ -2,24 +2,24 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import {
-  Sora_400Regular,
-  Sora_500Medium,
-  Sora_600SemiBold,
-  Sora_700Bold,
-  Sora_800ExtraBold,
-} from "@expo-google-fonts/sora";
+  IBMPlexSans_400Regular,
+  IBMPlexSans_500Medium,
+  IBMPlexSans_600SemiBold,
+  IBMPlexSans_700Bold,
+} from "@expo-google-fonts/ibm-plex-sans";
 import {
-  JetBrainsMono_400Regular,
-  JetBrainsMono_500Medium,
-  JetBrainsMono_700Bold,
-} from "@expo-google-fonts/jetbrains-mono";
+  IBMPlexMono_400Regular,
+  IBMPlexMono_500Medium,
+  IBMPlexMono_600SemiBold,
+} from "@expo-google-fonts/ibm-plex-mono";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { Platform, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import * as SystemUI from "expo-system-ui";
 import { I18nProvider } from "../i18n";
+import { frameHost } from "../components/FrameModal.shared";
 import { StoreProvider, useStore } from "../store";
 import { ThemeProvider, useTheme } from "../theme";
 import { applyLumenFonts } from "../fonts";
@@ -28,14 +28,13 @@ function ThemedRoot() {
   const { c } = useTheme();
   const { ready, settings } = useStore();
   const [fontsLoaded, fontError] = useFonts({
-    Sora_400Regular,
-    Sora_500Medium,
-    Sora_600SemiBold,
-    Sora_700Bold,
-    Sora_800ExtraBold,
-    JetBrainsMono_400Regular,
-    JetBrainsMono_500Medium,
-    JetBrainsMono_700Bold,
+    IBMPlexSans_400Regular,
+    IBMPlexSans_500Medium,
+    IBMPlexSans_600SemiBold,
+    IBMPlexSans_700Bold,
+    IBMPlexMono_400Regular,
+    IBMPlexMono_500Medium,
+    IBMPlexMono_600SemiBold,
   });
 
   useEffect(() => {
@@ -44,7 +43,7 @@ function ThemedRoot() {
     }
   }, [fontsLoaded, fontError]);
 
-  // Set system UI background color to match theme, eliminating white bars at top/bottom
+  // Match the system UI background so no white bars appear above or below the app.
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(c.bg).catch(() => {});
   }, [c.bg]);
@@ -55,7 +54,7 @@ function ThemedRoot() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <StatusBar style={settings.theme === "dark" ? "light" : "dark"} />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
     </View>
   );
 }
@@ -77,9 +76,47 @@ function Root() {
   );
 }
 
-export default function RootLayout() {
+/**
+ * Web-only: hold the app inside a phone-sized bezel so a laptop preview reads
+ * like the device. The bezel is deliberately inert (tinted to the dark
+ * substrate) so it never competes with the interface inside it.
+ */
+function WebPhoneStage({ children }: { children: React.ReactNode }) {
+  const { width, height } = useWindowDimensions();
+  const frameW = Math.min(390, Math.max(320, width - 48));
+  const frameH = Math.min(844, Math.max(480, height - 48));
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "transparent" }}>
+    <View style={webStage.outer}>
+      <View
+        ref={(node) => {
+          frameHost.node = node as unknown as HTMLElement | null;
+        }}
+        style={[webStage.phone, { width: frameW, height: frameH }]}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
+const webStage = {
+  outer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  phone: {
+    borderWidth: 1,
+    borderColor: "#2A2620",
+    backgroundColor: "#12110D",
+    overflow: "hidden",
+    boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+  },
+} as const;
+
+export default function RootLayout() {
+  const app = (
     <SafeAreaProvider>
       <KeyboardProvider>
         <StoreProvider>
@@ -87,6 +124,10 @@ export default function RootLayout() {
         </StoreProvider>
       </KeyboardProvider>
     </SafeAreaProvider>
+  );
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#080704" }}>
+      {Platform.OS === "web" ? <WebPhoneStage>{app}</WebPhoneStage> : app}
     </GestureHandlerRootView>
   );
 }
